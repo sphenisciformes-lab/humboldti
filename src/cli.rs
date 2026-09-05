@@ -24,7 +24,7 @@ use clap::{Parser, Subcommand};
 ///
 ///   pen -- config the server
 #[derive(Parser)]
-#[command(name = "pen")]
+#[command(name = "pen", version)]
 pub struct Cli {
     /// Override notes_dir for this invocation.
     #[arg(long, global = true)]
@@ -145,5 +145,25 @@ mod tests {
         assert!(Since::from_str("abcd").is_err());
         // 非 ASCII な末尾文字でも panic せずエラーになること。
         assert!(Since::from_str("7日").is_err());
+    }
+
+    // `--version`/`-V` は自由記述テキストの `allow_hyphen_values` に
+    // 飲み込まれず、clap 側で処理されなければならない
+    // (さもないと今日のメモに `--version` という行がそのまま追記される)。
+    #[test]
+    fn version_flag_is_handled_by_clap_not_captured_as_text() {
+        use clap::error::ErrorKind;
+
+        let err = Cli::try_parse_from(["pen", "--version"]).err().unwrap();
+        assert_eq!(err.kind(), ErrorKind::DisplayVersion);
+
+        let err = Cli::try_parse_from(["pen", "-V"]).err().unwrap();
+        assert_eq!(err.kind(), ErrorKind::DisplayVersion);
+    }
+
+    #[test]
+    fn hyphen_prefixed_note_text_still_parses_as_text() {
+        let cli = Cli::try_parse_from(["pen", "-500円使った"]).unwrap();
+        assert_eq!(cli.text, vec!["-500円使った"]);
     }
 }
