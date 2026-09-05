@@ -2,7 +2,7 @@
 
 A minimal daily markdown note-taking tool for your terminal.
 
-**Status: functional for daily use. Not yet published to crates.io.**
+**Status: functional for daily use.**
 
 Japanese README: [README.ja.md](README.ja.md)
 
@@ -111,10 +111,6 @@ gets Japanese text width and IME behaviour right is rarer still. Humboldti
 Note is built for both.
 
 ## Install
-
-**No release has been tagged yet — until then, only "From source" below works.**
-The other commands are what installation will look like once the first
-release goes out, so they're documented here in advance.
 
 **Homebrew** (macOS and Linux)
 
