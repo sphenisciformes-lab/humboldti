@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "humboldti-note",
   "display_name": "Humboldti Note",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A minimal daily markdown note-taking tool for your terminal.",
   "long_description": "Exposes your daily notes to Claude over MCP: search_notes, read_note, and append_note. Notes are plain markdown files under your notes directory (default ~/notes) -- no database, no lock-in.",
   "author": {
