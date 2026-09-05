@@ -1,0 +1,61 @@
+[package]
+name = "humboldti-note"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.89"
+description = "A minimal daily markdown note-taking tool for your terminal."
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/sphenisciformes-lab/humboldti"
+homepage = "https://github.com/sphenisciformes-lab/humboldti"
+readme = "README.md"
+keywords = ["markdown", "notes", "journal", "cli", "tui"]
+categories = ["command-line-utilities", "text-processing"]
+
+# 開発支援ファイルは crates.io のパッケージに含めない。
+# git にはコミットするが、利用者がダウンロードする必要はない。
+exclude = [
+    "CLAUDE.md",
+    ".claude/",
+    "docs/",
+    ".github/",
+    "mcpb/",
+]
+
+[[bin]]
+name = "pen"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+figment = { version = "0.10", features = ["toml", "env"] }
+toml = "0.8"
+chrono = "0.4"
+unicode-width = "0.2"
+unicode-segmentation = "1"
+etcetera = "0.8"
+shellexpand = "3"
+ratatui = "0.30"
+crossterm = "0.29"
+regex = "1"
+ignore = "0.4"
+tokio = { version = "1", features = ["rt"] }
+rmcp = { version = "3", features = ["transport-io"] }
+
+[dev-dependencies]
+tempfile = "3"
+# Jail（テスト用の環境変数/作業ディレクトリのサンドボックス）だけを
+# dev-dependencies 側で有効にする。通常ビルドには含まれない。
+figment = { version = "0.10", features = ["test"] }
+
+[profile.release]
+lto = true
+strip = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"

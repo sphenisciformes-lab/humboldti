@@ -1,0 +1,12 @@
+/target
+**/*.rs.bk
+
+# macOS
+.DS_Store
+
+# ローカルの作業メモ。共有しない
+/scratch/
+
+# mcpb pack の生成物（バイナリを含むのでコミットしない。README 参照）
+/mcpb/server/
+*.mcpb
