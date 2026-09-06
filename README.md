@@ -90,6 +90,10 @@ detail.
   starts a search, `q`/`Esc` quits. Every one of these is rebindable — see
   [Configuration](#configuration).
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo-preview-editor.gif" alt="Demo: the preview pane and opening a day in $EDITOR" width="700">
+</p>
+
 Press `/` from the calendar, or run `pen search <query>` directly, to
 search: type a query and press `Enter`, then `j`/`k` to move between
 results, `Enter` to open the selected day, `q`/`Esc` to go back. A plain

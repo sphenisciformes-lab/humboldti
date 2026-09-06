@@ -17,7 +17,7 @@ Humboldti Note はターミナルで動く、ミニマルな日次マークダ�
 English README: [README.md](README.md)
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo.gif" alt="デモ: メモの追記からカレンダー表示まで" width="700">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo-ja.gif" alt="デモ: メモの追記からカレンダー表示まで" width="700">
 </p>
 
 ## 機能
@@ -85,6 +85,10 @@ Humboldti Note には、サブコマンドを伴わない**素の形**と、**�
 `Enter` で `$EDITOR` で開く  
 `/` で検索開始、`q`/`Esc` で終了  
 すべて上書き可能です — [設定](#設定) 参照
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo-preview-editor-ja.gif" alt="デモ: プレビューペインと $EDITOR での編集" width="700">
+</p>
 
 ## 検索
 
