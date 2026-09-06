@@ -14,7 +14,6 @@ use crate::width;
 /// この幅未満ならプレビューペインを落とし、グリッドだけを表示する。
 const MIN_WIDTH_FOR_PREVIEW: u16 = 100;
 const CELL_WIDTH: u16 = 6;
-const WEEKDAY_HEADERS: [&str; 7] = ["日", "月", "火", "水", "木", "金", "土"];
 
 pub struct CalendarState {
     pub selected: NaiveDate,
@@ -160,7 +159,12 @@ fn density_style(notes_dir: &Path, date: NaiveDate) -> Style {
 const HELP_TEXT: &str =
     "hjkl/arrows: day/week   [ ]: month   { }: year   /: search   Enter: open   q/Esc: quit";
 
-pub fn draw(frame: &mut Frame, state: &CalendarState, notes_dir: &Path) {
+pub fn draw(
+    frame: &mut Frame,
+    state: &CalendarState,
+    notes_dir: &Path,
+    weekday_labels: &[String; 7],
+) {
     let area = frame.area();
     let [main_area, help_area] =
         Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(area);
@@ -176,11 +180,17 @@ pub fn draw(frame: &mut Frame, state: &CalendarState, notes_dir: &Path) {
         main_area
     };
 
-    draw_grid(frame, grid_area, state, notes_dir);
+    draw_grid(frame, grid_area, state, notes_dir, weekday_labels);
     frame.render_widget(Paragraph::new(HELP_TEXT), help_area);
 }
 
-fn draw_grid(frame: &mut Frame, area: Rect, state: &CalendarState, notes_dir: &Path) {
+fn draw_grid(
+    frame: &mut Frame,
+    area: Rect,
+    state: &CalendarState,
+    notes_dir: &Path,
+    weekday_labels: &[String; 7],
+) {
     let block = Block::bordered().title(state.selected.format("%Y-%m").to_string());
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -195,7 +205,7 @@ fn draw_grid(frame: &mut Frame, area: Rect, state: &CalendarState, notes_dir: &P
         width: inner.width,
         height: 1,
     };
-    let header: Vec<Span> = WEEKDAY_HEADERS
+    let header: Vec<Span> = weekday_labels
         .iter()
         .map(|d| Span::raw(width::pad(d, CELL_WIDTH as usize)))
         .collect();
@@ -394,9 +404,10 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let state = CalendarState::new(NaiveDate::from_ymd_opt(2026, 8, 15).unwrap());
         let tmp = tempfile::tempdir().unwrap();
+        let weekday_labels = ["日", "月", "火", "水", "木", "金", "土"].map(String::from);
 
         terminal
-            .draw(|frame| draw(frame, &state, tmp.path()))
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels))
             .unwrap();
 
         let content =
@@ -409,8 +420,8 @@ mod tests {
                     acc.push_str(cell.symbol());
                     acc
                 });
-        for header in WEEKDAY_HEADERS {
-            assert!(content.contains(header));
+        for header in &weekday_labels {
+            assert!(content.contains(header.as_str()));
         }
     }
 
@@ -420,9 +431,10 @@ mod tests {
         let mut terminal = Terminal::new(backend).unwrap();
         let state = CalendarState::new(NaiveDate::from_ymd_opt(2026, 8, 15).unwrap());
         let tmp = tempfile::tempdir().unwrap();
+        let weekday_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(String::from);
 
         terminal
-            .draw(|frame| draw(frame, &state, tmp.path()))
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels))
             .unwrap();
 
         let content =

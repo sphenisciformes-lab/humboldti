@@ -47,6 +47,9 @@ pub struct Config {
     pub editor: String,
     #[serde(default)]
     pub keys: KeysConfig,
+    /// `pen cal` のグリッド見出しに使う、日曜始まり7つの曜日表記。
+    #[serde(default = "default_weekday_labels")]
+    pub weekday_labels: [String; 7],
 }
 
 impl Default for Config {
@@ -56,6 +59,7 @@ impl Default for Config {
             merge_window_minutes: 30,
             editor: String::new(),
             keys: KeysConfig::default(),
+            weekday_labels: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(String::from),
         }
     }
 }
@@ -64,6 +68,10 @@ impl Default for Config {
 // 既定値そのものの定義ではない。値自体は Default::default() の 30 と一致させる。
 fn default_merge_window_minutes() -> u32 {
     Config::default().merge_window_minutes
+}
+
+fn default_weekday_labels() -> [String; 7] {
+    Config::default().weekday_labels
 }
 
 /// `[keys.<mode>]` ごとのアクション名→キー仕様表。実際の既定値は
@@ -271,6 +279,9 @@ const SEARCH_INPUT_COMMENT: &str = "# While typing a search query. Any key not l
 
 const SEARCH_RESULTS_COMMENT: &str = "# While browsing search results.\n";
 
+const WEEKDAY_LABELS_COMMENT: &str = "# The `pen cal` grid header, Sunday first. Any strings work, e.g. the\n\
+     # Japanese [\"日\", \"月\", \"火\", \"水\", \"木\", \"金\", \"土\"].\n";
+
 /// `Config::default()` を実際にシリアライズした値に、モードの並びを見ながら
 /// 説明コメントを差し込む。値そのものは常に `Config::default()` 由来なので、
 /// ここで二重管理になっているのはコメントの文面だけ(そして文面は既定値が
@@ -289,6 +300,7 @@ fn render_default_config() -> String {
             _ if line.starts_with("notes_dir") => out.push_str(NOTES_DIR_COMMENT),
             _ if line.starts_with("merge_window_minutes") => out.push_str(MERGE_WINDOW_COMMENT),
             _ if line.starts_with("editor") => out.push_str(EDITOR_COMMENT),
+            _ if line.starts_with("weekday_labels") => out.push_str(WEEKDAY_LABELS_COMMENT),
             "[keys.calendar]" => out.push_str(KEYS_HEADER_COMMENT),
             "[keys.search_input]" => out.push_str(SEARCH_INPUT_COMMENT),
             "[keys.search_results]" => out.push_str(SEARCH_RESULTS_COMMENT),
@@ -438,6 +450,7 @@ mod tests {
         assert!(rendered.contains("# Where daily notes are written"));
         assert!(rendered.contains("# Command (with any arguments) used to open a note"));
         assert!(rendered.contains("# Keybindings for `pen cal`"));
+        assert!(rendered.contains("# The `pen cal` grid header"));
 
         // コメントは TOML のコメント構文として妥当で、パースすると実際の
         // 既定値になること。値は常に `Config::default()` からシリアライズ
@@ -451,5 +464,40 @@ mod tests {
         assert_eq!(parsed.merge_window_minutes, 30);
         assert_eq!(parsed.editor, "");
         assert_eq!(parsed.keys, KeysConfig::default());
+        assert_eq!(
+            parsed.weekday_labels,
+            ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        );
+    }
+
+    #[test]
+    fn weekday_labels_default_to_english() {
+        assert_eq!(
+            Config::default().weekday_labels,
+            ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        );
+    }
+
+    #[test]
+    #[allow(clippy::result_large_err)]
+    fn weekday_labels_are_overridable_from_the_config_file() {
+        figment::Jail::expect_with(|jail| {
+            let home = jail.directory().to_path_buf();
+            jail.set_env("HOME", home.display());
+            jail.set_env("XDG_CONFIG_HOME", home.join("xdg").display());
+            jail.create_dir("xdg/pen")?;
+            jail.create_file(
+                "xdg/pen/config.toml",
+                "weekday_labels = [\"日\", \"月\", \"火\", \"水\", \"木\", \"金\", \"土\"]\n",
+            )?;
+
+            let config = resolve(None).map_err(|e| e.to_string())?;
+            assert_eq!(
+                config.weekday_labels,
+                ["日", "月", "火", "水", "木", "金", "土"]
+            );
+
+            Ok(())
+        });
     }
 }

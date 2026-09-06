@@ -276,7 +276,9 @@ fn run_cal(cfg: &Config) -> anyhow::Result<()> {
     let result = (|| -> anyhow::Result<()> {
         loop {
             terminal.draw(|frame| match screen {
-                Screen::Calendar => calendar::draw(frame, &calendar_state, &cfg.notes_dir),
+                Screen::Calendar => {
+                    calendar::draw(frame, &calendar_state, &cfg.notes_dir, &cfg.weekday_labels)
+                }
                 Screen::SearchInput => search::draw_input(frame, &search_state),
                 Screen::SearchResults => search::draw_results(frame, &search_state),
             })?;

@@ -173,6 +173,7 @@ pen config init
 | `notes_dir` | ノートの保存先 |
 | `merge_window_minutes` | 何分経つと新しい追記が新しい時刻見出しを作るか |
 | `editor` | ノートを開くコマンド。未設定なら `$EDITOR`、それも無ければ `vi` |
+| `weekday_labels` | `pen cal` の曜日見出し(日曜始まり7つ)。既定は英語(`Sun`〜`Sat`)。日本語などお好きな文字列に変更可能 |
 | `[keys.calendar]` | カレンダー画面のキー割り当て |
 | `[keys.search_input]` | 検索クエリ入力中のキー割り当て |
 | `[keys.search_results]` | 検索結果一覧でのキー割り当て |
