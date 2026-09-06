@@ -2,6 +2,13 @@
   <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/logo.png" alt="Humboldti Note" width="400">
 </p>
 
+<p align="center">
+  <a href="https://github.com/sphenisciformes-lab/humboldti/actions/workflows/ci.yml"><img src="https://github.com/sphenisciformes-lab/humboldti/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://crates.io/crates/humboldti-note"><img src="https://img.shields.io/crates/v/humboldti-note.svg" alt="Crates.io"></a>
+  <img src="https://img.shields.io/crates/l/humboldti-note.svg" alt="License">
+  <img src="https://img.shields.io/crates/msrv/humboldti-note.svg" alt="MSRV">
+</p>
+
 A minimal daily markdown note-taking tool for your terminal. Named after the
 Humboldt penguin — the command is `pen`, short for penguin.
 
