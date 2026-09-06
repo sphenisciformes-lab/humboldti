@@ -1,4 +1,6 @@
-# Humboldti Note
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/logo.png" alt="Humboldti Note" width="400">
+</p>
 
 A minimal daily markdown note-taking tool for your terminal. Named after the
 Humboldt penguin — the command is `pen`, short for penguin.

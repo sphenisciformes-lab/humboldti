@@ -1,4 +1,6 @@
-# Humboldti Note
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/logo.png" alt="Humboldti Note" width="400">
+</p>
 
 Humboldti Note はターミナルで動く、ミニマルな日次マークダウンメモツールです。  
 名前の由来はフンボルトペンギン(Humboldti Penguin)。コマンドが`pen`なのはその略です。

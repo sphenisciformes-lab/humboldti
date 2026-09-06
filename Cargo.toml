@@ -19,6 +19,8 @@ exclude = [
     "docs/",
     ".github/",
     "mcpb/",
+    # README 埋め込み用のロゴ。GitHub raw URL 経由で参照するのでパッケージには不要。
+    "assets/",
 ]
 
 [[bin]]
