@@ -16,6 +16,10 @@ Humboldti Note はターミナルで動く、ミニマルな日次マークダ�
 
 English README: [README.md](README.md)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo.gif" alt="デモ: メモの追記からカレンダー表示まで" width="700">
+</p>
+
 ## 機能
 
 - **記録** : `pen <テキスト>` は今日のファイルに書き込みます。

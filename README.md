@@ -17,6 +17,10 @@ happens, right in your terminal.**
 
 Japanese README: [README.ja.md](README.ja.md)
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo.gif" alt="Demo: capturing a note and browsing the calendar" width="700">
+</p>
+
 ## Features
 
 - **Frictionless capture.** `pen <text>` writes to today's file and exits — no editor, no prompt.
