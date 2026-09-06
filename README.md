@@ -1,8 +1,10 @@
 # Humboldti Note
 
-A minimal daily markdown note-taking tool for your terminal.
+A minimal daily markdown note-taking tool for your terminal. Named after the
+Humboldt penguin — the command is `pen`, short for penguin.
 
-**Status: functional for daily use.**
+**Capture whatever crosses your mind — an idea, a task — the moment it
+happens, right in your terminal.**
 
 Japanese README: [README.ja.md](README.ja.md)
 

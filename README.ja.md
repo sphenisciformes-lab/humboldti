@@ -1,8 +1,9 @@
 # Humboldti Note
 
-Humboldti Note はターミナルで動く、ミニマルな日次マークダウンメモツールです。
+Humboldti Note はターミナルで動く、ミニマルな日次マークダウンメモツールです。  
+名前の由来はフンボルトペンギン(Humboldti Penguin)。コマンドが`pen`なのはその略です。
 
-**状態: 日常利用に足る機能は揃っています。**
+**日々の思いつきやタスクを、思いついた瞬間にそのままターミナルへ書き留められます。**
 
 English README: [README.md](README.md)
 
