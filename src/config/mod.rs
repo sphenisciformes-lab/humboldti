@@ -253,6 +253,7 @@ const MERGE_WINDOW_COMMENT: &str = "# Consecutive appends within this many minut
 
 const EDITOR_COMMENT: &str = "# Command (with any arguments) used to open a note, e.g. \"nvim\" or\n\
      # \"code --wait\". Empty (the default) falls back to $EDITOR, then \"vi\".\n\
+     # Run through `sh -c` like git's core.editor, so quote paths with spaces.\n\
      # GUI editors need their own \"wait for the window to close\" flag (like\n\
      # code's --wait) or pen will think you're done editing immediately.\n\
      # Overridable with the PEN_EDITOR environment variable.\n";

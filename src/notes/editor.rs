@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use chrono::{Local, NaiveDate};
 
@@ -65,17 +66,19 @@ pub fn open_in_editor(
         .filter(|e| !e.is_empty())
         .map(str::to_string)
         .or_else(|| std::env::var("EDITOR").ok());
-    let editor = parse_editor_command(raw_editor.as_deref());
-    let status = std::process::Command::new(&editor[0])
-        .args(&editor[1..])
-        .arg(&path)
-        .status()
-        .map_err(|source| NotesError::EditorLaunch {
-            command: editor[0].clone(),
-            source,
-        })?;
+    let editor = editor_or_default(raw_editor.as_deref());
+    let status =
+        editor_command(editor, &path)
+            .status()
+            .map_err(|source| NotesError::EditorLaunch {
+                command: editor.to_string(),
+                source,
+            })?;
     if !status.success() {
-        return Err(NotesError::EditorExit { status });
+        return Err(NotesError::EditorExit {
+            command: editor.to_string(),
+            status,
+        });
     }
 
     if let Some((original_len, seeded)) = seeded {
@@ -103,20 +106,28 @@ pub fn open_in_editor(
     Ok(path)
 }
 
-/// エディタコマンド(設定の `editor` か `$EDITOR` の値)を空白区切りで
-/// コマンド+引数に分解する。未設定/空なら `vi`。環境変数を直接読まない
-/// 純粋関数にして、テストで env を汚さないようにする。
-fn parse_editor_command(raw: Option<&str>) -> Vec<String> {
-    let parts: Vec<String> = raw
-        .unwrap_or_default()
-        .split_whitespace()
-        .map(str::to_string)
-        .collect();
-    if parts.is_empty() {
-        vec!["vi".to_string()]
-    } else {
-        parts
+/// エディタコマンド(設定の `editor` か `$EDITOR` の値)。未設定/空白だけなら
+/// `vi`。環境変数を直接読まない純粋関数にして、テストで env を汚さないようにする。
+fn editor_or_default(raw: Option<&str>) -> &str {
+    match raw.map(str::trim) {
+        Some(editor) if !editor.is_empty() => editor,
+        _ => "vi",
     }
+}
+
+/// git と同じく `sh -c '<editor> "$@"' <editor> <path>` の形で起動する。
+/// シェルに解釈させるので、`code --wait` のような引数付きの指定も、引用符で
+/// 囲んだ空白入りのパス(`"/Applications/Sublime Text.app/.../subl" -w`)も、
+/// 利用者がシェルに書くのと同じ書き方で通る。空白で機械的に分割すると後者が
+/// 壊れる。ノートのパスは `$@` で渡すので、パス自体はシェルに解釈されない。
+fn editor_command(editor: &str, path: &Path) -> Command {
+    let mut command = Command::new("sh");
+    command
+        .arg("-c")
+        .arg(format!("{editor} \"$@\""))
+        .arg(editor)
+        .arg(path);
+    command
 }
 
 #[cfg(test)]
@@ -124,18 +135,64 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_editor_command_defaults_to_vi() {
-        assert_eq!(parse_editor_command(None), vec!["vi".to_string()]);
-        assert_eq!(parse_editor_command(Some("")), vec!["vi".to_string()]);
-        assert_eq!(parse_editor_command(Some("   ")), vec!["vi".to_string()]);
+    fn editor_or_default_falls_back_to_vi() {
+        assert_eq!(editor_or_default(None), "vi");
+        assert_eq!(editor_or_default(Some("")), "vi");
+        assert_eq!(editor_or_default(Some("   ")), "vi");
+        assert_eq!(editor_or_default(Some(" code --wait ")), "code --wait");
+    }
+
+    /// 引数を1行ずつ、`$0` 相当のスクリプト名は除いて、ノートに書き足す
+    /// 偽エディタを `dir` に作る。
+    fn arg_recording_editor(dir: &Path) -> PathBuf {
+        use std::os::unix::fs::PermissionsExt;
+
+        std::fs::create_dir_all(dir).unwrap();
+        let script = dir.join("fake editor.sh");
+        std::fs::write(
+            &script,
+            "#!/bin/sh\nfor last; do :; done\nfor a; do [ \"$a\" = \"$last\" ] || echo \"arg:$a\" >> \"$last\"; done\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+        script
     }
 
     #[test]
-    fn parse_editor_command_splits_arguments() {
+    #[allow(clippy::result_large_err)]
+    fn open_in_editor_names_the_editor_when_it_fails() {
+        figment::Jail::expect_with(|jail| {
+            let notes_dir = jail.directory().join("notes");
+            let date = NaiveDate::from_ymd_opt(2020, 1, 1).unwrap();
+
+            let err =
+                open_in_editor(&notes_dir, date, 30, "no-such-editor-for-pen-tests").unwrap_err();
+
+            // sh 自体は起動できるので、見つからないことは終了コードで分かる。
+            assert!(matches!(err, NotesError::EditorExit { .. }));
+            assert!(err.to_string().contains("no-such-editor-for-pen-tests"));
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn editor_command_accepts_a_quoted_path_with_spaces_and_arguments() {
+        let tmp = tempfile::tempdir().unwrap();
+        let script = arg_recording_editor(&tmp.path().join("dir with space"));
+        // シェルのメタ文字を含むノートのパスも、`$@` 経由なので解釈されない。
+        let note = tmp.path().join("my notes $(touch pwned).md");
+        std::fs::write(&note, "").unwrap();
+        let editor = format!("'{}' --wait 'two words'", script.display());
+
+        let status = editor_command(&editor, &note).status().unwrap();
+
+        assert!(status.success());
         assert_eq!(
-            parse_editor_command(Some("code --wait")),
-            vec!["code".to_string(), "--wait".to_string()]
+            std::fs::read_to_string(&note).unwrap(),
+            "arg:--wait\narg:two words\n"
         );
+        assert!(!tmp.path().join("pwned").exists());
     }
 
     #[test]

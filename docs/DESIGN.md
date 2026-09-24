@@ -169,6 +169,13 @@ GUI エディタ(VS Code など)は既定でコマンドをバックグラウン
 Humboldti Note 側では検知も強制もできない——`git commit` が `$EDITOR` に
 `--wait` を要求するのと同じ制約。
 
+エディタコマンドは git と同じく `sh -c '<editor> "$@"'` で起動する。
+`$EDITOR` は利用者がシェルの書き方で書く値なので、空白で機械的に分割すると
+`"/Applications/Sublime Text.app/Contents/SharedSupport/bin/subl" -w` のような
+引用符付きの空白入りパスが壊れる。git と同じ解釈にしておけば、既に git で
+動いている `$EDITOR` はそのまま動く。ノートのパスは `$@` で渡すので、パス自体は
+シェルに解釈されない。Windows は配布対象外なので `sh` の存在を前提にしてよい。
+
 ## 名前
 
 v1 前に改名した。旧名は打鍵しづらく、2文字級の短いコマンドにできなかった。
