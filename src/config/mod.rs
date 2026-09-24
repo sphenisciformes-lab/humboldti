@@ -272,7 +272,7 @@ const KEYS_HEADER_COMMENT: &str = "\
 #
 # A typo'd action name is ignored with a warning. An unparseable key spec,
 # or two actions in the same table claiming the same key, fails to start
-# `pen cal`.
+# `pen cal`. \"ctrl-c\" can't be bound: it always quits, on every screen.
 ";
 
 const SEARCH_INPUT_COMMENT: &str = "# While typing a search query. Any key not listed here is typed into\n\

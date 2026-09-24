@@ -84,7 +84,8 @@ Humboldti Note には、サブコマンドを伴わない**素の形**と、**�
 `[`/`]` で月移動、`{`/`}` で年移動  
 `Enter` で `$EDITOR` で開く  
 `/` で検索開始、`q`/`Esc` で終了  
-すべて上書き可能です — [設定](#設定) 参照
+すべて上書き可能です — [設定](#設定) 参照  
+`Ctrl-C` はどの画面でも常に終了します
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo-preview-editor-ja.gif" alt="デモ: プレビューペインと $EDITOR での編集" width="700">

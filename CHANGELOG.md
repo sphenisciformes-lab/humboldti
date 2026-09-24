@@ -7,6 +7,22 @@ they are always listed under **Changed** or **Removed**.
 
 ## Unreleased
 
+### Changed
+
+- `ctrl-c` can no longer be bound in `[keys.*]`; doing so fails to start
+  `pen cal` with an error. It is reserved for quitting (see below).
+
+### Fixed
+
+- `Ctrl-C` now quits `pen cal` from any screen. It used to be ignored in the
+  calendar and typed a `c` into the search query.
+- Other `Ctrl` and `Alt` key combinations are no longer typed into the search
+  query as plain letters.
+- Uppercase keys in `[keys.*]` (`"G"`, or `"shift-g"`) now work. They were
+  accepted but never matched, because the terminal reports them with Shift held.
+- Tab-indented lines (such as nested `- [ ]` items) keep their indentation in
+  the `pen cal` preview pane and search results. Tabs used to be dropped.
+
 ## [0.2.0] - 2026-09-24
 
 ### Changed

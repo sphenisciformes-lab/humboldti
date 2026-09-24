@@ -101,6 +101,12 @@ pub enum KeyMapError {
         #[source]
         source: KeyParseError,
     },
+    #[error("key `{key}` bound to `{action}` in [keys.{mode}] is reserved: ctrl-c always quits")]
+    Reserved {
+        mode: &'static str,
+        action: String,
+        key: String,
+    },
     #[error("key `{key}` in [keys.{mode}] is bound to both `{first}` and `{second}`")]
     Conflict {
         mode: &'static str,
@@ -162,6 +168,13 @@ fn build_mode_map(
                     key: spec.clone(),
                     source,
                 })?;
+            if (code, modifiers) == QUIT_KEY {
+                return Err(KeyMapError::Reserved {
+                    mode,
+                    action: (*name).to_string(),
+                    key: spec.clone(),
+                });
+            }
             if let Some(&owner) = owners.get(&(code, modifiers))
                 && owner != *name
             {
@@ -180,16 +193,28 @@ fn build_mode_map(
     Ok(map)
 }
 
+/// raw mode では端末が Ctrl-C を SIGINT に変えないので、自前で扱わないと
+/// Ctrl-C では抜けられない。「とにかく抜ける」キーとして端末の慣習どおりに
+/// 動くよう、割り当て変更の対象外にして、どの画面でも終了にする。
+const QUIT_KEY: (KeyCode, KeyModifiers) = (KeyCode::Char('c'), KeyModifiers::CONTROL);
+
 /// `KeyEvent` を直接 match するのはこの関数だけにする。呼び出し側は
 /// `Action` だけを見て、キーそのものを知らなくてよいようにする。
 pub fn resolve(keymap: &KeyMap, key: KeyEvent, mode: Mode) -> Option<Action> {
-    if let Some(&action) = keymap.table(mode).get(&(key.code, key.modifiers)) {
+    let normalized = keys::normalize(key.code, key.modifiers);
+    if normalized == QUIT_KEY {
+        return Some(Action::Quit);
+    }
+    if let Some(&action) = keymap.table(mode).get(&normalized) {
         return Some(action);
     }
     match mode {
         // 割り当てられていない文字キーは、そのまま検索クエリの入力として扱う。
+        // Ctrl や Alt 付きのキーは文字の入力ではないので、クエリに入れない。
         Mode::SearchInput => match key.code {
-            KeyCode::Char(c) => Some(Action::InputChar(c)),
+            KeyCode::Char(c) if (key.modifiers - KeyModifiers::SHIFT).is_empty() => {
+                Some(Action::InputChar(c))
+            }
             _ => None,
         },
         Mode::Calendar | Mode::SearchResults => None,
@@ -363,6 +388,94 @@ mod tests {
         );
         // 既定の `l` は上書きされて消える。
         assert_eq!(resolve(&m, key(KeyCode::Char('l')), Mode::Calendar), None);
+    }
+
+    // crossterm は大文字を SHIFT 付きで送ってくる(`Char('G')` + SHIFT)。
+    #[test]
+    fn uppercase_bindings_match_the_shifted_event_crossterm_sends() {
+        let mut cfg = KeysConfig::default();
+        cfg.calendar
+            .insert("next_month".to_string(), vec!["N".to_string()]);
+        cfg.calendar
+            .insert("prev_month".to_string(), vec!["shift-p".to_string()]);
+        let m = KeyMap::from_config(&cfg).unwrap();
+        let shifted = |c| KeyEvent {
+            modifiers: KeyModifiers::SHIFT,
+            ..key(KeyCode::Char(c))
+        };
+
+        assert_eq!(
+            resolve(&m, shifted('N'), Mode::Calendar),
+            Some(Action::NextMonth)
+        );
+        assert_eq!(
+            resolve(&m, shifted('P'), Mode::Calendar),
+            Some(Action::PrevMonth)
+        );
+        // 小文字の割り当てには影響しない。
+        assert_eq!(
+            resolve(&m, key(KeyCode::Char('h')), Mode::Calendar),
+            Some(Action::PrevDay)
+        );
+    }
+
+    #[test]
+    fn uppercase_and_shift_forms_of_one_key_conflict() {
+        let mut cfg = KeysConfig::default();
+        cfg.calendar
+            .insert("next_month".to_string(), vec!["G".to_string()]);
+        cfg.calendar
+            .insert("prev_month".to_string(), vec!["shift-g".to_string()]);
+
+        assert!(matches!(
+            KeyMap::from_config(&cfg),
+            Err(KeyMapError::Conflict { .. })
+        ));
+    }
+
+    #[test]
+    fn ctrl_c_quits_from_every_screen() {
+        let m = default_keymap();
+        let ctrl_c = KeyEvent {
+            modifiers: KeyModifiers::CONTROL,
+            ..key(KeyCode::Char('c'))
+        };
+        for mode in [Mode::Calendar, Mode::SearchInput, Mode::SearchResults] {
+            assert_eq!(resolve(&m, ctrl_c, mode), Some(Action::Quit));
+        }
+    }
+
+    #[test]
+    fn ctrl_and_alt_keys_are_not_typed_into_the_search_query() {
+        let m = default_keymap();
+        for modifiers in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+            let event = KeyEvent {
+                modifiers,
+                ..key(KeyCode::Char('x'))
+            };
+            assert_eq!(resolve(&m, event, Mode::SearchInput), None);
+        }
+        // Shift 付きの文字(大文字)は普通に入力できる。
+        let shifted = KeyEvent {
+            modifiers: KeyModifiers::SHIFT,
+            ..key(KeyCode::Char('X'))
+        };
+        assert_eq!(
+            resolve(&m, shifted, Mode::SearchInput),
+            Some(Action::InputChar('X'))
+        );
+    }
+
+    #[test]
+    fn binding_ctrl_c_is_a_startup_error() {
+        let mut cfg = KeysConfig::default();
+        cfg.calendar
+            .insert("open".to_string(), vec!["ctrl-c".to_string()]);
+
+        assert!(matches!(
+            KeyMap::from_config(&cfg),
+            Err(KeyMapError::Reserved { .. })
+        ));
     }
 
     #[test]

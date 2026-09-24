@@ -5,6 +5,9 @@ use unicode_width::UnicodeWidthChar;
 // （Config 導入後に配線予定）が無いv0.0時点ではこれを固定で使う。
 const ELLIPSIS: &str = "…";
 const ELLIPSIS_WIDTH: usize = 1;
+/// マークダウンの入れ子リストの字下げとして読みやすく、狭いプレビュー
+/// ペインでも横幅を食いすぎない幅。
+const TAB_WIDTH: usize = 4;
 
 /// 端末の桁数での表示幅。
 pub fn width(s: &str) -> usize {
@@ -48,6 +51,34 @@ pub fn pad(s: &str, target: usize) -> String {
         base.push_str(&" ".repeat(target - w));
     }
     base
+}
+
+/// タブを次のタブ位置までの空白に置き換える。ratatui はタブを描画せずに
+/// 捨て、`width` もタブを 0 桁と数えるので、タブで字下げした入れ子の
+/// リスト(`\t- [ ] ...`)が字下げなしで表示されてしまう。描画する前に
+/// これを通すこと。桁は grapheme の表示幅で数えるので、日本語の後ろの
+/// タブも揃う。
+pub fn expand_tabs(s: &str) -> String {
+    let mut result = String::with_capacity(s.len());
+    let mut column = 0;
+    for g in s.graphemes(true) {
+        match g {
+            "\t" => {
+                let spaces = TAB_WIDTH - column % TAB_WIDTH;
+                result.push_str(&" ".repeat(spaces));
+                column += spaces;
+            }
+            "\n" | "\r\n" => {
+                result.push_str(g);
+                column = 0;
+            }
+            _ => {
+                result.push_str(g);
+                column += grapheme_width(g);
+            }
+        }
+    }
+    result
 }
 
 /// 各行が最大 `max` 桁になるよう折り返す。
@@ -111,6 +142,17 @@ mod tests {
     fn pad_reaches_exact_width() {
         assert_eq!(width(&pad("日本", 10)), 10);
         assert_eq!(width(&pad("日本語日本語", 6)), 6);
+    }
+
+    #[test]
+    fn expand_tabs_advances_to_the_next_tab_stop() {
+        assert_eq!(expand_tabs("\t- [ ] sub"), "    - [ ] sub");
+        assert_eq!(expand_tabs("ab\tc"), "ab  c");
+        // 日本語(2桁ずつ)の後ろでも、表示上の桁でタブ位置に揃う。
+        assert_eq!(expand_tabs("日本語\tx"), "日本語  x");
+        // 改行でタブ位置の数え直しが始まる。
+        assert_eq!(expand_tabs("abc\n\tx"), "abc\n    x");
+        assert_eq!(expand_tabs("no tabs"), "no tabs");
     }
 
     #[test]

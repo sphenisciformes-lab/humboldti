@@ -71,6 +71,8 @@ pub enum Command {
     /// { }: jump by year
     ///
     /// /: search, Enter: open, q/Esc: quit
+    ///
+    /// Ctrl-C: quit from any screen
     Cal,
     /// Search notes. The query is a regular expression (case-insensitive).
     Search { query: Vec<String> },
