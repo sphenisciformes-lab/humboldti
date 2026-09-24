@@ -64,6 +64,9 @@ pub enum Command {
     },
     /// Browse notes in a calendar view.
     ///
+    /// Default keys (rebind them under [keys.*] in the config file; the
+    /// calendar shows the keys actually in use at the bottom of the screen):
+    ///
     /// hjkl/arrows: move by day/week
     ///
     /// [ ]: jump by month

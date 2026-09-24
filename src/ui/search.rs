@@ -50,12 +50,14 @@ impl Default for SearchState {
     }
 }
 
-pub fn draw_input(frame: &mut Frame, state: &SearchState) {
+/// `help` はキーの案内(`KeyMap::help_items` から組み立てる)。
+pub fn draw_input(frame: &mut Frame, state: &SearchState, help: &str) {
     let area = frame.area();
     let [input_area, message_area] =
         Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).areas(area);
 
-    let block = Block::bordered().title("Search (Enter: search, Esc: cancel)");
+    let title = bordered_title(&format!("Search ({help})"), input_area.width);
+    let block = Block::bordered().title(title);
     let inner = block.inner(input_area);
     let text = format!("/{}", state.query);
     frame.render_widget(Paragraph::new(text.clone()).block(block), input_area);
@@ -86,14 +88,21 @@ fn scroll_offset(offset: usize, selected: usize, height: usize, len: usize) -> u
     offset.min(len.saturating_sub(height))
 }
 
-pub fn draw_results(frame: &mut Frame, state: &mut SearchState) {
+/// 枠線の上に載るタイトルを、枠の内側の幅に収まるよう切り詰める。
+/// 検索クエリや案内が長いと、そのままでは枠からはみ出して切れる。
+fn bordered_title(title: &str, outer_width: u16) -> String {
+    width::truncate(title, outer_width.saturating_sub(2) as usize)
+}
+
+/// `help` はキーの案内(`KeyMap::help_items` から組み立てる)。
+pub fn draw_results(frame: &mut Frame, state: &mut SearchState, help: &str) {
     let area = frame.area();
     let title = format!(
-        "Search results for \"{}\" ({}) — j/k: move, Enter: open, q/Esc: back",
+        "Search results for \"{}\" ({}) — {help}",
         state.query,
         state.results.len()
     );
-    let block = Block::bordered().title(title);
+    let block = Block::bordered().title(bordered_title(&title, area.width));
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -182,7 +191,7 @@ mod tests {
         state.results = vec![hit("2026-08-30", 3, long_line)];
 
         terminal
-            .draw(|frame| draw_results(frame, &mut state))
+            .draw(|frame| draw_results(frame, &mut state, ""))
             .unwrap();
 
         let content =
@@ -234,7 +243,7 @@ mod tests {
         }
 
         terminal
-            .draw(|frame| draw_results(frame, &mut state))
+            .draw(|frame| draw_results(frame, &mut state, ""))
             .unwrap();
 
         let content =
@@ -262,7 +271,7 @@ mod tests {
         state.query = "nothing-matches-this".to_string();
 
         terminal
-            .draw(|frame| draw_results(frame, &mut state))
+            .draw(|frame| draw_results(frame, &mut state, ""))
             .unwrap();
 
         let content =

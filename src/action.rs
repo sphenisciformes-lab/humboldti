@@ -6,7 +6,7 @@ use crate::config::KeysConfig;
 use crate::keys::{self, KeyParseError};
 
 /// 今どの画面にいるか。キー解決はモードごとに変わる。
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Mode {
     Calendar,
     /// 検索クエリを入力中。文字キーはナビゲーションではなく入力として扱う。
@@ -17,7 +17,7 @@ pub enum Mode {
 
 /// 意図で命名する。キー割り当てが変わっても名前は変えない
 /// (設定ファイルからアクション名を参照する利用者がいる)。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Action {
     PrevDay,
     NextDay,
@@ -118,9 +118,16 @@ pub enum KeyMapError {
 
 /// 設定から組み立てた、モードごとのキー→アクション表。
 pub struct KeyMap {
-    calendar: HashMap<(KeyCode, KeyModifiers), Action>,
-    search_input: HashMap<(KeyCode, KeyModifiers), Action>,
-    search_results: HashMap<(KeyCode, KeyModifiers), Action>,
+    calendar: ModeMap,
+    search_input: ModeMap,
+    search_results: ModeMap,
+}
+
+/// 1つのモードの割り当て。`first_key` は案内表示用で、各アクションに
+/// 設定で最初に書かれたキー仕様(書かれた通りの文字列)を持つ。
+struct ModeMap {
+    keys: HashMap<(KeyCode, KeyModifiers), Action>,
+    first_key: HashMap<Action, String>,
 }
 
 impl KeyMap {
@@ -136,13 +143,83 @@ impl KeyMap {
         })
     }
 
-    fn table(&self, mode: Mode) -> &HashMap<(KeyCode, KeyModifiers), Action> {
+    fn mode_map(&self, mode: Mode) -> &ModeMap {
         match mode {
             Mode::Calendar => &self.calendar,
             Mode::SearchInput => &self.search_input,
             Mode::SearchResults => &self.search_results,
         }
     }
+
+    fn table(&self, mode: Mode) -> &HashMap<(KeyCode, KeyModifiers), Action> {
+        &self.mode_map(mode).keys
+    }
+
+    /// 画面に出すキーの案内(`"h l: day"` のような項目の並び)。キーは
+    /// 実際の割り当てから引くので、設定で割り当てを変えても案内がずれない。
+    /// 幅を取りすぎないよう、各アクションには最初に割り当てたキーだけを出す。
+    /// キーが1つも割り当てられていないアクションは出さない。
+    pub fn help_items(&self, mode: Mode) -> Vec<String> {
+        let first_key = &self.mode_map(mode).first_key;
+        help_for_mode(mode)
+            .iter()
+            .filter_map(|(label, actions)| {
+                let keys: Vec<String> = actions
+                    .iter()
+                    .filter_map(|action| first_key.get(action))
+                    .map(|spec| display_key(spec))
+                    .collect();
+                (!keys.is_empty()).then(|| format!("{}: {label}", keys.join(" ")))
+            })
+            .collect()
+    }
+}
+
+/// 案内に並べる項目。前後の移動のように対になるアクションは1項目にまとめる。
+/// ここには何を並べるかだけを書き、キーそのものは書かない。
+const CALENDAR_HELP: &[(&str, &[Action])] = &[
+    ("day", &[Action::PrevDay, Action::NextDay]),
+    ("week", &[Action::PrevWeek, Action::NextWeek]),
+    ("month", &[Action::PrevMonth, Action::NextMonth]),
+    ("year", &[Action::PrevYear, Action::NextYear]),
+    ("search", &[Action::EnterSearch]),
+    ("open", &[Action::Open]),
+    ("quit", &[Action::Quit]),
+];
+
+const SEARCH_INPUT_HELP: &[(&str, &[Action])] = &[
+    ("search", &[Action::Confirm]),
+    ("cancel", &[Action::Cancel]),
+];
+
+const SEARCH_RESULTS_HELP: &[(&str, &[Action])] = &[
+    ("move", &[Action::NextResult, Action::PrevResult]),
+    ("open", &[Action::Confirm]),
+    ("back", &[Action::Cancel]),
+];
+
+fn help_for_mode(mode: Mode) -> &'static [(&'static str, &'static [Action])] {
+    match mode {
+        Mode::Calendar => CALENDAR_HELP,
+        Mode::SearchInput => SEARCH_INPUT_HELP,
+        Mode::SearchResults => SEARCH_RESULTS_HELP,
+    }
+}
+
+/// キー仕様を案内用に整える。`enter`・`ctrl-a` のような名前付きのキーと
+/// 修飾キーは先頭を大文字に(`Enter`、`Ctrl-a`)し、1文字のキーはそのまま
+/// 出す(`G` と `g` は別のキーなので大文字小文字を変えられない)。
+fn display_key(spec: &str) -> String {
+    spec.split('-')
+        .map(|part| {
+            let mut chars = part.chars();
+            match (chars.next(), chars.clone().next()) {
+                (Some(first), Some(_)) => first.to_uppercase().chain(chars).collect(),
+                _ => part.to_string(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("-")
 }
 
 /// 設定ファイルに知らないアクション名があってもここでは無視する
@@ -152,8 +229,9 @@ fn build_mode_map(
     mode: &'static str,
     lookup_mode: Mode,
     configured: &BTreeMap<String, Vec<String>>,
-) -> Result<HashMap<(KeyCode, KeyModifiers), Action>, KeyMapError> {
+) -> Result<ModeMap, KeyMapError> {
     let mut map = HashMap::new();
+    let mut first_key = HashMap::new();
     let mut owners: HashMap<(KeyCode, KeyModifiers), &str> = HashMap::new();
 
     for (name, action, _) in actions_for_mode(lookup_mode) {
@@ -187,10 +265,14 @@ fn build_mode_map(
             }
             owners.insert((code, modifiers), name);
             map.insert((code, modifiers), *action);
+            first_key.entry(*action).or_insert_with(|| spec.clone());
         }
     }
 
-    Ok(map)
+    Ok(ModeMap {
+        keys: map,
+        first_key,
+    })
 }
 
 /// raw mode では端末が Ctrl-C を SIGINT に変えないので、自前で扱わないと
@@ -431,6 +513,58 @@ mod tests {
             KeyMap::from_config(&cfg),
             Err(KeyMapError::Conflict { .. })
         ));
+    }
+
+    #[test]
+    fn help_items_show_the_default_keys() {
+        let m = default_keymap();
+        assert_eq!(
+            m.help_items(Mode::Calendar),
+            [
+                "h l: day",
+                "k j: week",
+                "[ ]: month",
+                "{ }: year",
+                "/: search",
+                "Enter: open",
+                "q: quit"
+            ]
+        );
+        assert_eq!(
+            m.help_items(Mode::SearchInput),
+            ["Enter: search", "Esc: cancel"]
+        );
+        assert_eq!(
+            m.help_items(Mode::SearchResults),
+            ["j k: move", "Enter: open", "q: back"]
+        );
+    }
+
+    #[test]
+    fn help_items_follow_rebound_and_unbound_keys() {
+        let mut cfg = KeysConfig::default();
+        cfg.calendar
+            .insert("next_day".to_string(), vec!["n".to_string()]);
+        cfg.calendar.insert("open".to_string(), vec![]);
+        cfg.calendar
+            .insert("quit".to_string(), vec!["ctrl-q".to_string()]);
+        let m = KeyMap::from_config(&cfg).unwrap();
+
+        let items = m.help_items(Mode::Calendar);
+        assert!(items.contains(&"h n: day".to_string()));
+        assert!(items.contains(&"Ctrl-q: quit".to_string()));
+        // キーが1つも無いアクションは案内に出さない。
+        assert!(!items.iter().any(|item| item.ends_with(": open")));
+    }
+
+    #[test]
+    fn display_key_capitalizes_names_but_not_single_characters() {
+        assert_eq!(display_key("enter"), "Enter");
+        assert_eq!(display_key("ctrl-shift-tab"), "Ctrl-Shift-Tab");
+        assert_eq!(display_key("ctrl-a"), "Ctrl-a");
+        assert_eq!(display_key("G"), "G");
+        assert_eq!(display_key("g"), "g");
+        assert_eq!(display_key("/"), "/");
     }
 
     #[test]

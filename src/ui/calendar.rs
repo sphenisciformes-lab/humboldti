@@ -156,14 +156,13 @@ fn density_style(notes_dir: &Path, date: NaiveDate) -> Style {
     }
 }
 
-const HELP_TEXT: &str =
-    "hjkl/arrows: day/week   [ ]: month   { }: year   /: search   Enter: open   q/Esc: quit";
-
+/// `help` は画面下部に出すキーの案内(`KeyMap::help_items` から組み立てる)。
 pub fn draw(
     frame: &mut Frame,
     state: &CalendarState,
     notes_dir: &Path,
     weekday_labels: &[String; 7],
+    help: &str,
 ) {
     let area = frame.area();
     let [main_area, help_area] =
@@ -181,7 +180,10 @@ pub fn draw(
     };
 
     draw_grid(frame, grid_area, state, notes_dir, weekday_labels);
-    frame.render_widget(Paragraph::new(HELP_TEXT), help_area);
+    frame.render_widget(
+        Paragraph::new(width::truncate(help, help_area.width as usize)),
+        help_area,
+    );
 }
 
 fn draw_grid(
@@ -407,7 +409,7 @@ mod tests {
         let weekday_labels = ["日", "月", "火", "水", "木", "金", "土"].map(String::from);
 
         terminal
-            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels))
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels, ""))
             .unwrap();
 
         let content =
@@ -438,7 +440,7 @@ mod tests {
         let weekday_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(String::from);
 
         terminal
-            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels))
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels, ""))
             .unwrap();
 
         let buffer = terminal.backend().buffer();
@@ -459,6 +461,28 @@ mod tests {
     }
 
     #[test]
+    fn help_line_is_truncated_to_the_terminal_width() {
+        let backend = TestBackend::new(40, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let state = CalendarState::new(NaiveDate::from_ymd_opt(2026, 8, 15).unwrap());
+        let tmp = tempfile::tempdir().unwrap();
+        let weekday_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(String::from);
+        let help = "h l: day   k j: week   [ ]: month   { }: year   /: search";
+
+        terminal
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels, help))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let last_row: String = (0..buffer.area.width)
+            .map(|x| buffer[(x, buffer.area.height - 1)].symbol())
+            .collect();
+        assert!(last_row.starts_with("h l: day"));
+        // 収まらない分は黙って切れるのではなく、省略記号で切れたことが分かる。
+        assert!(last_row.trim_end().ends_with('…'));
+    }
+
+    #[test]
     fn preview_pane_is_hidden_below_min_width() {
         let backend = TestBackend::new(MIN_WIDTH_FOR_PREVIEW - 1, 20);
         let mut terminal = Terminal::new(backend).unwrap();
@@ -467,7 +491,7 @@ mod tests {
         let weekday_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(String::from);
 
         terminal
-            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels))
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels, ""))
             .unwrap();
 
         let content =
