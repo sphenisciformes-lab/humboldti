@@ -39,6 +39,32 @@ pub fn truncate(s: &str, max: usize) -> String {
     result
 }
 
+/// 末尾側を残して最大 `max` 桁に収める。切った場合は先頭に `…` を付ける。
+/// grapheme cluster を分割しない。入力欄のように、今打っている末尾側を
+/// 見せたい場所で使う(`truncate` はその逆で先頭側を残す)。
+pub fn tail(s: &str, max: usize) -> String {
+    if width(s) <= max {
+        return s.to_string();
+    }
+    if max == 0 {
+        return String::new();
+    }
+
+    let budget = max - ELLIPSIS_WIDTH;
+    let mut kept = Vec::new();
+    let mut running = 0;
+    for g in s.graphemes(true).rev() {
+        let w = grapheme_width(g);
+        if running + w > budget {
+            break;
+        }
+        kept.push(g);
+        running += w;
+    }
+    kept.reverse();
+    format!("{ELLIPSIS}{}", kept.concat())
+}
+
 /// ちょうど `target` 桁になるよう空白で埋める。長すぎる場合は切り詰める。
 pub fn pad(s: &str, target: usize) -> String {
     let mut base = if width(s) > target {
@@ -136,6 +162,17 @@ mod tests {
         // "日本語" を 5 桁で切ると、半端な文字ではなく
         // 4 桁ぶんの文字 + 省略記号になること。
         assert_eq!(width(&truncate("日本語", 5)), 5);
+    }
+
+    #[test]
+    fn tail_keeps_the_end_and_never_splits_a_wide_char() {
+        assert_eq!(tail("abc", 5), "abc");
+        assert_eq!(tail("abcdef", 4), "…def");
+        // "日本語" の末尾を 4 桁に収めると、半端な文字ではなく
+        // 省略記号 + 1 文字(計 3 桁)になる。
+        assert_eq!(tail("日本語", 4), "…語");
+        assert!(width(&tail("日本語日本語", 5)) <= 5);
+        assert_eq!(tail("abc", 0), "");
     }
 
     #[test]

@@ -36,6 +36,8 @@ they are always listed under **Changed** or **Removed**.
   is wide now end in `…` rather than being cut off without warning.
 - `pen context --since` with a huge value (such as `4000000000d`) no longer
   crashes. The range is capped at about 100 years.
+- A search query longer than the input box no longer pushes the cursor out of
+  view. The box shows the end of the query, which is the part you're typing.
 
 ## [0.2.0] - 2026-09-24
 
