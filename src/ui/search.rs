@@ -11,6 +11,9 @@ pub struct SearchState {
     pub query: String,
     pub results: Vec<SearchHit>,
     pub selected: usize,
+    /// 結果一覧の表示開始位置。表示できる行数は描画時にしか分からないので、
+    /// `draw_results` が選択行が見えるように調整する。
+    pub offset: usize,
     pub error: Option<String>,
 }
 
@@ -20,6 +23,7 @@ impl SearchState {
             query: String::new(),
             results: Vec::new(),
             selected: 0,
+            offset: 0,
             error: None,
         }
     }
@@ -65,7 +69,24 @@ pub fn draw_input(frame: &mut Frame, state: &SearchState) {
     }
 }
 
-pub fn draw_results(frame: &mut Frame, state: &SearchState) {
+/// 前回の表示開始位置をできるだけ保ったまま、選択行が見える位置に調整する。
+/// 毎回選択行を先頭や末尾に合わせ直すと、j/k のたびに一覧全体が動いて
+/// 目で追いにくい。端末を広げたときに末尾の下が空かないよう、`len` でも抑える。
+fn scroll_offset(offset: usize, selected: usize, height: usize, len: usize) -> usize {
+    if height == 0 {
+        return offset;
+    }
+    let offset = if selected < offset {
+        selected
+    } else if selected >= offset + height {
+        selected + 1 - height
+    } else {
+        offset
+    };
+    offset.min(len.saturating_sub(height))
+}
+
+pub fn draw_results(frame: &mut Frame, state: &mut SearchState) {
     let area = frame.area();
     let title = format!(
         "Search results for \"{}\" ({}) — j/k: move, Enter: open, q/Esc: back",
@@ -85,11 +106,15 @@ pub fn draw_results(frame: &mut Frame, state: &SearchState) {
         return;
     }
 
+    let height = inner.height as usize;
+    state.offset = scroll_offset(state.offset, state.selected, height, state.results.len());
+
     let lines: Vec<Line> = state
         .results
         .iter()
         .enumerate()
-        .take(inner.height as usize)
+        .skip(state.offset)
+        .take(height)
         .map(|(i, hit)| {
             let prefix = width::pad(&format!("{} L{}", hit.date, hit.line_number), 20);
             let remaining = (inner.width as usize).saturating_sub(width::width(&prefix));
@@ -156,7 +181,9 @@ mod tests {
         let long_line = "a very long line that should be truncated to fit the pane";
         state.results = vec![hit("2026-08-30", 3, long_line)];
 
-        terminal.draw(|frame| draw_results(frame, &state)).unwrap();
+        terminal
+            .draw(|frame| draw_results(frame, &mut state))
+            .unwrap();
 
         let content =
             terminal
@@ -176,13 +203,67 @@ mod tests {
     }
 
     #[test]
+    fn scroll_offset_keeps_the_selection_visible_and_moves_as_little_as_possible() {
+        // 表示範囲内の移動では動かない。
+        assert_eq!(scroll_offset(0, 4, 5, 20), 0);
+        // 下端を越えたら、選択行が最下行に来る分だけ進む。
+        assert_eq!(scroll_offset(0, 5, 5, 20), 1);
+        // 戻るときは、上端を越えるまで動かない。
+        assert_eq!(scroll_offset(3, 5, 5, 20), 3);
+        assert_eq!(scroll_offset(3, 2, 5, 20), 2);
+        // 端末が広がって末尾の下が空くなら、その分だけ戻す。
+        assert_eq!(scroll_offset(15, 19, 10, 20), 10);
+        // 全件が収まるなら先頭から。
+        assert_eq!(scroll_offset(2, 2, 10, 3), 0);
+        // 描画領域が無いときは触らない。
+        assert_eq!(scroll_offset(3, 7, 0, 20), 3);
+    }
+
+    #[test]
+    fn results_list_scrolls_to_keep_the_selection_on_screen() {
+        // 枠線を除いた結果一覧の高さは 3 行。
+        let backend = TestBackend::new(40, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = SearchState::new();
+        state.query = "x".to_string();
+        state.results = (1..=10)
+            .map(|day| hit(&format!("2026-08-{day:02}"), 1, "x"))
+            .collect();
+        for _ in 0..6 {
+            state.select_next();
+        }
+
+        terminal
+            .draw(|frame| draw_results(frame, &mut state))
+            .unwrap();
+
+        let content =
+            terminal
+                .backend()
+                .buffer()
+                .content()
+                .iter()
+                .fold(String::new(), |mut acc, cell| {
+                    acc.push_str(cell.symbol());
+                    acc
+                });
+        assert!(
+            content.contains("2026-08-07"),
+            "選択中の7件目が画面外に出ている"
+        );
+        assert!(!content.contains("2026-08-01"));
+    }
+
+    #[test]
     fn empty_results_show_a_placeholder() {
         let backend = TestBackend::new(40, 10);
         let mut terminal = Terminal::new(backend).unwrap();
         let mut state = SearchState::new();
         state.query = "nothing-matches-this".to_string();
 
-        terminal.draw(|frame| draw_results(frame, &state)).unwrap();
+        terminal
+            .draw(|frame| draw_results(frame, &mut state))
+            .unwrap();
 
         let content =
             terminal
