@@ -7,6 +7,11 @@ they are always listed under **Changed** or **Removed**.
 
 ## Unreleased
 
+### Added
+
+- `pen cal` marks today (bold and underlined), so you can find it after moving
+  the selection to another day.
+
 ### Changed
 
 - The MCP `search_notes` tool returns at most 100 matching lines (newest

@@ -83,6 +83,8 @@ detail.
 - Each day's background reflects how much you wrote that day (none / some /
   a lot), using your terminal's own ANSI colors — so it looks right in both
   light and dark themes instead of assuming a dark background.
+- Today is shown bold and underlined, so it stays easy to find after you move
+  the selection away.
 - A preview pane shows the selected day's note (hidden automatically on
   narrower terminals).
 - Default keys: `hjkl`/arrows move by day/week, `[`/`]` jump by month,

@@ -17,6 +17,9 @@ const CELL_WIDTH: u16 = 6;
 
 pub struct CalendarState {
     pub selected: NaiveDate,
+    /// 起動した日。選択を別の日に動かしても今日がどこか分かるよう、
+    /// セルに印を付けるために持つ。
+    pub today: NaiveDate,
 }
 
 pub enum CalendarRequest {
@@ -27,7 +30,10 @@ pub enum CalendarRequest {
 
 impl CalendarState {
     pub fn new(today: NaiveDate) -> Self {
-        Self { selected: today }
+        Self {
+            selected: today,
+            today,
+        }
     }
 
     /// `Action` を受けて状態を進める。エディタを開く/終了するなど
@@ -235,6 +241,23 @@ fn draw_grid(
     }
 }
 
+/// 濃淡(`density`)の上に、月外・選択中・今日の印を重ねる。今日は太字+
+/// 下線にする。背景色は濃淡が、反転は選択中が使っているので、どちらとも
+/// 重ねて見分けられる印として残っているのがこの2つ。
+fn cell_style(density: Style, date: NaiveDate, state: &CalendarState) -> Style {
+    let mut style = density;
+    if date.month() != state.selected.month() {
+        style = style.fg(Color::DarkGray);
+    }
+    if date == state.selected {
+        style = style.add_modifier(Modifier::REVERSED);
+    }
+    if date == state.today {
+        style = style.add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
+    }
+    style
+}
+
 fn draw_cell(
     frame: &mut Frame,
     area: Rect,
@@ -243,13 +266,7 @@ fn draw_cell(
     notes_dir: &Path,
 ) {
     let label = width::pad(&date.day().to_string(), CELL_WIDTH as usize);
-    let mut style = density_style(notes_dir, date);
-    if date.month() != state.selected.month() {
-        style = style.fg(Color::DarkGray);
-    }
-    if date == state.selected {
-        style = style.add_modifier(Modifier::REVERSED);
-    }
+    let style = cell_style(density_style(notes_dir, date), date, state);
     frame.render_widget(Paragraph::new(label).style(style), area);
 }
 
@@ -458,6 +475,22 @@ mod tests {
         };
         // 子の項目は、親より 1 タブ(4 桁)右に字下げされて表示される。
         assert_eq!(column_of("- [ ] 子"), column_of("- [ ] 親") + 4);
+    }
+
+    #[test]
+    fn today_is_marked_even_after_the_selection_moves_away() {
+        let today = NaiveDate::from_ymd_opt(2026, 8, 15).unwrap();
+        let mut state = CalendarState::new(today);
+        state.apply(Action::NextDay);
+        let marked = Modifier::BOLD | Modifier::UNDERLINED;
+
+        let today_style = cell_style(Style::default(), today, &state);
+        let selected_style = cell_style(Style::default(), state.selected, &state);
+
+        assert!(today_style.add_modifier.contains(marked));
+        assert!(!today_style.add_modifier.contains(Modifier::REVERSED));
+        assert!(selected_style.add_modifier.contains(Modifier::REVERSED));
+        assert!(!selected_style.add_modifier.contains(marked));
     }
 
     #[test]
