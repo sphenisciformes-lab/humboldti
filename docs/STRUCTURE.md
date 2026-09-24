@@ -23,6 +23,7 @@ humboldti/
 ├── .gitignore              開発
 │
 ├── README.md               配布  英語。プロジェクトの顔
+├── CHANGELOG.md            配布  英語。利用者に見える変更の記録
 ├── README.ja.md            配布  日本語版（任意）
 ├── LICENSE-MIT             配布
 ├── LICENSE-APACHE          配布

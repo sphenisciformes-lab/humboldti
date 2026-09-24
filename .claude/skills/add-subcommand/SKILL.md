@@ -81,6 +81,8 @@ enum Action { NextDay, PrevDay, Open, Search, Quit, /* ここに追加 */ }
 
 - ヘルプテキスト — 完全な文で、専門用語を使わずに。多くの利用者が読むのはここだけ
 - 利用者向けのコマンドなら `README.md` のコマンド一覧
+- `CHANGELOG.md` の `Unreleased` — 追加は `Added`。既存のフラグや `--json` の
+  フィールド、挙動を変えるなら `Changed`/`Removed`(CLAUDE.md の互換性の段階を確認)
 - `docs/ROADMAP.md` — 予定セクションから該当項目を移す
 - `docs/DESIGN.md` — 将来の読み手が覆したくなりそうな判断をした場合のみ
 
@@ -100,3 +102,4 @@ cargo test
 - 新しい設定フィールドを `render_default_config` のコメントに反映し忘れている
 - アクションを意図ではなくキーで命名している
 - ヘルプテキストを、既にツールを知っている人向けに書いている
+- `CHANGELOG.md` への記載

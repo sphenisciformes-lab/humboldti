@@ -183,7 +183,7 @@ built-in defaults.
 |---|---|
 | `notes_dir` | Where daily notes are written |
 | `merge_window_minutes` | Minutes before a new append starts a new time heading |
-| `editor` | Command used to open a note; falls back to `$EDITOR`, then `vi` |
+| `editor` | Command used to open a note; falls back to `$EDITOR`, then `vi`. Run through `sh -c` like git's `core.editor`, so quote paths containing spaces |
 | `weekday_labels` | The 7 column headers in `pen cal`, Sunday first. Defaults to English (`Sun`..`Sat`); any strings work, e.g. Japanese |
 | `[keys.calendar]` | Keybindings for the calendar screen |
 | `[keys.search_input]` | Keybindings while typing a search query |

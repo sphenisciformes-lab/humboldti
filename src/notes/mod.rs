@@ -31,8 +31,11 @@ pub enum NotesError {
         #[source]
         source: std::io::Error,
     },
-    #[error("editor exited with a non-zero status: {status}")]
-    EditorExit { status: std::process::ExitStatus },
+    #[error("editor `{command}` exited with a non-zero status: {status}")]
+    EditorExit {
+        command: String,
+        status: std::process::ExitStatus,
+    },
     #[error("invalid search pattern `{pattern}`: {source}")]
     InvalidPattern {
         pattern: String,

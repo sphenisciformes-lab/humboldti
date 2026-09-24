@@ -33,8 +33,19 @@ pub fn search(notes_dir: &Path, pattern: &str) -> Result<Vec<SearchHit>, NotesEr
             source,
         })?;
 
+    // .gitignore などの除外ルールは使わない。ノートディレクトリが dotfiles
+    // リポジトリの中にあって ignore されていたり、親ディレクトリの
+    // .gitignore に引っかかったりすると、検索が黙って0件になるため。
+    // ノートかどうかはファイル名で判定しているので、除外ルールに頼る必要もない。
+    // 隠しディレクトリ(.git、.trash など)だけは引き続き辿らない——削除済みの
+    // ノートの置き場になりうるので、そこにヒットしても利用者には意外なだけ。
+    let walker = ignore::WalkBuilder::new(notes_dir)
+        .standard_filters(false)
+        .hidden(true)
+        .build();
+
     let mut hits = Vec::new();
-    for entry in ignore::WalkBuilder::new(notes_dir).build().flatten() {
+    for entry in walker.flatten() {
         if !entry.file_type().is_some_and(|t| t.is_file()) {
             continue;
         }
@@ -106,6 +117,35 @@ mod tests {
 
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].date, date);
+    }
+
+    #[test]
+    fn search_is_not_affected_by_gitignore_or_ignore_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        // ノートディレクトリごと ignore している dotfiles リポジトリ。
+        std::fs::create_dir(tmp.path().join(".git")).unwrap();
+        std::fs::write(tmp.path().join(".gitignore"), "notes/\n").unwrap();
+        let notes_dir = tmp.path().join("notes");
+        let date = NaiveDate::from_ymd_opt(2026, 8, 30).unwrap();
+        write_note(&notes_dir, date, "## 10:00\ntoken\n");
+        std::fs::write(notes_dir.join(".ignore"), "2026/\n").unwrap();
+
+        let hits = search(&notes_dir, "token").unwrap();
+
+        assert_eq!(hits.len(), 1);
+        assert_eq!(hits[0].date, date);
+    }
+
+    #[test]
+    fn search_skips_hidden_directories() {
+        let tmp = tempfile::tempdir().unwrap();
+        let trash = tmp.path().join(".trash");
+        std::fs::create_dir_all(&trash).unwrap();
+        std::fs::write(trash.join("2026-08-30.md"), "token\n").unwrap();
+
+        let hits = search(tmp.path(), "token").unwrap();
+
+        assert!(hits.is_empty());
     }
 
     #[test]
