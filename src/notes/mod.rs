@@ -280,6 +280,25 @@ fn carry_over_items(notes_dir: &Path, date: NaiveDate) -> Vec<String> {
     Vec::new()
 }
 
+/// 今日のファイルの先頭に置く繰り越しブロック(末尾の空行込み)。無ければ空。
+///
+/// 繰り越すのは今日のファイルを今まさに新規作成する瞬間(`contents` が空)
+/// だけ。既に何か書かれていれば、その時点で繰り越し済みか、繰り越す物が
+/// 無かったかのどちらか。`append` と `open_in_editor` の両方から使う。
+/// 見出しはこのブロックより後に置くこと——繰り越しは今日書いたものでは
+/// ないので、時刻見出しの対象を「実際に今日書いた内容」だけにする。
+fn carried_block(notes_dir: &Path, date: NaiveDate, contents: &str) -> String {
+    if !contents.is_empty() {
+        return String::new();
+    }
+    let carried = carry_over_items(notes_dir, date);
+    if carried.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n\n", carried.join("\n"))
+    }
+}
+
 /// `-t`/`--todo` 用に、テキストを未完了チェックリスト行(`- [ ] <text>`)へ
 /// 整形する。既に `- [` で始まっている(手で `- [ ]`/`- [x]` を書いた)なら
 /// 二重に付けない。空文字はそのまま返す — 空にするかどうかの判断は
@@ -363,26 +382,8 @@ pub fn append(
         None => {
             let heading_line = new_heading_line(&contents, now);
             let heading = now.format("%H:%M").to_string();
-            // 今日のファイルを今まさに新規作成する瞬間だけ、前日以前から
-            // 未完了タスクを繰り越す。
-            let carried = if contents.is_empty() {
-                carry_over_items(notes_dir, now.date_naive())
-            } else {
-                Vec::new()
-            };
-            let carried_block = if carried.is_empty() {
-                String::new()
-            } else {
-                format!("{}\n\n", carried.join("\n"))
-            };
-            // 見出しは繰り越し項目より後に置く。繰り越しは今日書いたもの
-            // ではないので、時刻見出しの対象を「実際に今日書いた内容」
-            // だけにする——見た目の区切りにもなる。
-            (
-                format!("{carried_block}{heading_line}{text}\n"),
-                heading,
-                false,
-            )
+            let carried = carried_block(notes_dir, now.date_naive(), &contents);
+            (format!("{carried}{heading_line}{text}\n"), heading, false)
         }
     };
 
@@ -434,21 +435,10 @@ pub fn open_in_editor(
         file.read_to_string(&mut original).map_err(io_err)?;
         match pending_heading(&original, merge_window_minutes, Local::now()) {
             Some(heading_line) => {
-                // 今日のファイルを今まさに新規作成する瞬間だけ、前日以前から
-                // 未完了タスクを繰り越しておく。エディタを開いたときに
-                // 最初から見えている状態にする。
-                let carried = if original.is_empty() {
-                    carry_over_items(notes_dir, date)
-                } else {
-                    Vec::new()
-                };
-                let carried_block = if carried.is_empty() {
-                    String::new()
-                } else {
-                    format!("{}\n\n", carried.join("\n"))
-                };
-                // append() と同じ理由で、見出しは繰り越し項目より後に置く。
-                let addition = format!("{carried_block}{heading_line}");
+                // 繰り越し項目も、エディタを開いたときに最初から見えている
+                // 状態にしておく。
+                let carried = carried_block(notes_dir, date, &original);
+                let addition = format!("{carried}{heading_line}");
                 // read_to_string でカーソルは既に EOF にあるので、そのまま書けば追記になる。
                 file.write_all(addition.as_bytes()).map_err(io_err)?;
                 Some((original.len(), format!("{original}{addition}")))
