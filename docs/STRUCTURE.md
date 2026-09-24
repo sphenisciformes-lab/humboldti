@@ -35,7 +35,11 @@ humboldti/
 │   ├── config/
 │   │   └── mod.rs          Config 構造体、既定値、読み込み
 │   ├── notes/
-│   │   └── mod.rs          パス解決、追記、パース
+│   │   ├── mod.rs          パス解決、追記、時刻見出し、ファイルロック
+│   │   ├── carry_over.rs   未完了タスクの繰り越し
+│   │   ├── editor.rs       外部エディタで開く
+│   │   ├── search.rs       全文検索
+│   │   └── context.rs      `pen context` の収集
 │   └── ui/
 │       ├── mod.rs
 │       ├── calendar.rs     カレンダー画面
