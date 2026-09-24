@@ -7,6 +7,8 @@ they are always listed under **Changed** or **Removed**.
 
 ## Unreleased
 
+## [0.3.0] - 2026-09-24
+
 ### Added
 
 - `pen cal` marks today (bold and underlined), so you can find it after moving
@@ -65,4 +67,5 @@ they are always listed under **Changed** or **Removed**.
 - The search results list in `pen cal` scrolls to keep the selected result
   visible.
 
+[0.3.0]: https://github.com/sphenisciformes-lab/humboldti/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sphenisciformes-lab/humboldti/compare/v0.1.2...v0.2.0
