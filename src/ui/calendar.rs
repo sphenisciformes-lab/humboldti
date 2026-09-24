@@ -268,7 +268,7 @@ fn draw_preview(frame: &mut Frame, area: Rect, state: &CalendarState, notes_dir:
     } else {
         content
     };
-    let lines: Vec<Line> = width::wrap(&text, inner.width as usize)
+    let lines: Vec<Line> = width::wrap(&width::expand_tabs(&text), inner.width as usize)
         .into_iter()
         .take(inner.height as usize)
         .map(Line::raw)
@@ -423,6 +423,39 @@ mod tests {
         for header in &weekday_labels {
             assert!(content.contains(header.as_str()));
         }
+    }
+
+    #[test]
+    fn preview_keeps_tab_indentation_of_nested_items() {
+        let backend = TestBackend::new(120, 20);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 8, 15).unwrap();
+        let state = CalendarState::new(date);
+        let tmp = tempfile::tempdir().unwrap();
+        let path = notes::note_path(tmp.path(), date);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, "- [ ] 親\n\t- [ ] 子\n").unwrap();
+        let weekday_labels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(String::from);
+
+        terminal
+            .draw(|frame| draw(frame, &state, tmp.path(), &weekday_labels))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        let rows: Vec<String> = (0..buffer.area.height)
+            .map(|y| {
+                (0..buffer.area.width)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect()
+            })
+            .collect();
+        // 行頭からその項目までの表示幅(桁)。
+        let column_of = |item: &str| {
+            let row = rows.iter().find(|r| r.contains(item)).unwrap();
+            width::width(&row[..row.find(item).unwrap()])
+        };
+        // 子の項目は、親より 1 タブ(4 桁)右に字下げされて表示される。
+        assert_eq!(column_of("- [ ] 子"), column_of("- [ ] 親") + 4);
     }
 
     #[test]

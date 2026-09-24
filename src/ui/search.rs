@@ -118,7 +118,7 @@ pub fn draw_results(frame: &mut Frame, state: &mut SearchState) {
         .map(|(i, hit)| {
             let prefix = width::pad(&format!("{} L{}", hit.date, hit.line_number), 20);
             let remaining = (inner.width as usize).saturating_sub(width::width(&prefix));
-            let content = width::truncate(&hit.line, remaining);
+            let content = width::truncate(&width::expand_tabs(&hit.line), remaining);
             let text = format!("{prefix}{content}");
             if i == state.selected {
                 Line::styled(text, Style::default().add_modifier(Modifier::REVERSED))
