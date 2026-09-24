@@ -26,6 +26,8 @@ they are always listed under **Changed** or **Removed**.
   titles) now show your configured keys. They were fixed text, so they showed
   the default keys even after you rebound them. Hints longer than the terminal
   is wide now end in `…` rather than being cut off without warning.
+- `pen context --since` with a huge value (such as `4000000000d`) no longer
+  crashes. The range is capped at about 100 years.
 
 ## [0.2.0] - 2026-09-24
 
