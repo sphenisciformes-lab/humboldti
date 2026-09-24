@@ -27,6 +27,12 @@ impl PenMcp {
     }
 }
 
+/// `search_notes` が返すヒットの上限。数年分のノートをありふれた語で検索すると
+/// 数千行になり、エージェントのコンテキストを1回の呼び出しで使い切ってしまう。
+/// ヒットは新しい日付順なので、残るのは直近のもの。引数で変えられるように
+/// しないのは、MCP の引数が凍結対象の公開 API だから(CLAUDE.md)。
+const SEARCH_NOTES_LIMIT: usize = 100;
+
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 struct SearchNotesParams {
     /// Case-insensitive regular expression to search for.
@@ -47,7 +53,10 @@ struct AppendNoteParams {
 
 #[tool_router]
 impl PenMcp {
-    #[tool(description = "Search notes. The query is a case-insensitive regular expression.")]
+    #[tool(
+        description = "Search notes. The query is a case-insensitive regular expression. \
+            Returns at most 100 matching lines, newest first."
+    )]
     fn search_notes(
         &self,
         Parameters(SearchNotesParams { query }): Parameters<SearchNotesParams>,
@@ -57,11 +66,18 @@ impl PenMcp {
                 "no matches",
             )])),
             Ok(hits) => {
-                let text = hits
+                let mut text = hits
                     .iter()
+                    .take(SEARCH_NOTES_LIMIT)
                     .map(|h| format!("{}:{}: {}", h.path.display(), h.line_number, h.line))
                     .collect::<Vec<_>>()
                     .join("\n");
+                let omitted = hits.len().saturating_sub(SEARCH_NOTES_LIMIT);
+                if omitted > 0 {
+                    text.push_str(&format!(
+                        "\n({omitted} more matching lines not shown; narrow the query to see them)"
+                    ));
+                }
                 Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
             }
             Err(err) => Ok(CallToolResult::error(vec![ContentBlock::text(
@@ -156,6 +172,28 @@ mod tests {
 
         assert!(!result.is_error.unwrap_or(false));
         assert!(text_of(&result).contains("Meeting notes"));
+    }
+
+    #[test]
+    fn search_notes_returns_at_most_the_limit_and_says_how_many_were_left_out() {
+        let tmp = tempfile::tempdir().unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 8, 30).unwrap();
+        let contents: String = (0..SEARCH_NOTES_LIMIT + 5)
+            .map(|i| format!("token {i}\n"))
+            .collect();
+        write_note(tmp.path(), date, &contents);
+        let server = PenMcp::new(tmp.path().to_path_buf(), 30);
+
+        let result = server
+            .search_notes(Parameters(SearchNotesParams {
+                query: "token".to_string(),
+            }))
+            .unwrap();
+
+        let text = text_of(&result);
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), SEARCH_NOTES_LIMIT + 1);
+        assert!(lines[SEARCH_NOTES_LIMIT].contains("5 more matching lines not shown"));
     }
 
     #[test]

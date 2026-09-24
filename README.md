@@ -254,7 +254,7 @@ $ pen --json context --since 2w > fortnight.json    # feed to a script
 server over stdio, exposing three tools that call straight into the same code
 `pen` uses on the command line:
 
-- `search_notes(query)` — case-insensitive regex search across all notes
+- `search_notes(query)` — case-insensitive regex search across all notes (at most 100 matching lines, newest first)
 - `read_note(date)` — read one day's note (`YYYY-MM-DD`)
 - `append_note(text)` — append to today's note, same as `pen <text>`
 

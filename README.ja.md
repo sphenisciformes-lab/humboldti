@@ -245,7 +245,7 @@ $ pen --json context --since 2w > fortnight.json    # スクリプトに渡す
 `pen mcp` は [Model Context Protocol](https://modelcontextprotocol.io) のサーバーを stdio 上で動かします。  
 公開する3つのツールは、コマンドラインの`pen` と同じコードをそのまま呼んでいます:
 
-- `search_notes(query)` — 大文字小文字を区別しない正規表現でメモ全体を検索
+- `search_notes(query)` — 大文字小文字を区別しない正規表現でメモ全体を検索(新しい順に最大100行)
 - `read_note(date)` — 指定した日(`YYYY-MM-DD`)のメモを読む
 - `append_note(text)` — 今日のメモに追記(`pen <text>` と同じ)
 

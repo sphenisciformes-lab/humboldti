@@ -9,6 +9,9 @@ they are always listed under **Changed** or **Removed**.
 
 ### Changed
 
+- The MCP `search_notes` tool returns at most 100 matching lines (newest
+  first) and says how many more it left out, so one broad query can't fill an
+  agent's context. Use `pen search` for the full list.
 - `ctrl-c` can no longer be bound in `[keys.*]`; doing so fails to start
   `pen cal` with an error. It is reserved for quitting (see below).
 
