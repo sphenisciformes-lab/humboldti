@@ -183,7 +183,10 @@ fn build_mode_map(
 /// `KeyEvent` を直接 match するのはこの関数だけにする。呼び出し側は
 /// `Action` だけを見て、キーそのものを知らなくてよいようにする。
 pub fn resolve(keymap: &KeyMap, key: KeyEvent, mode: Mode) -> Option<Action> {
-    if let Some(&action) = keymap.table(mode).get(&(key.code, key.modifiers)) {
+    if let Some(&action) = keymap
+        .table(mode)
+        .get(&keys::normalize(key.code, key.modifiers))
+    {
         return Some(action);
     }
     match mode {
@@ -363,6 +366,49 @@ mod tests {
         );
         // 既定の `l` は上書きされて消える。
         assert_eq!(resolve(&m, key(KeyCode::Char('l')), Mode::Calendar), None);
+    }
+
+    // crossterm は大文字を SHIFT 付きで送ってくる(`Char('G')` + SHIFT)。
+    #[test]
+    fn uppercase_bindings_match_the_shifted_event_crossterm_sends() {
+        let mut cfg = KeysConfig::default();
+        cfg.calendar
+            .insert("next_month".to_string(), vec!["N".to_string()]);
+        cfg.calendar
+            .insert("prev_month".to_string(), vec!["shift-p".to_string()]);
+        let m = KeyMap::from_config(&cfg).unwrap();
+        let shifted = |c| KeyEvent {
+            modifiers: KeyModifiers::SHIFT,
+            ..key(KeyCode::Char(c))
+        };
+
+        assert_eq!(
+            resolve(&m, shifted('N'), Mode::Calendar),
+            Some(Action::NextMonth)
+        );
+        assert_eq!(
+            resolve(&m, shifted('P'), Mode::Calendar),
+            Some(Action::PrevMonth)
+        );
+        // 小文字の割り当てには影響しない。
+        assert_eq!(
+            resolve(&m, key(KeyCode::Char('h')), Mode::Calendar),
+            Some(Action::PrevDay)
+        );
+    }
+
+    #[test]
+    fn uppercase_and_shift_forms_of_one_key_conflict() {
+        let mut cfg = KeysConfig::default();
+        cfg.calendar
+            .insert("next_month".to_string(), vec!["G".to_string()]);
+        cfg.calendar
+            .insert("prev_month".to_string(), vec!["shift-g".to_string()]);
+
+        assert!(matches!(
+            KeyMap::from_config(&cfg),
+            Err(KeyMapError::Conflict { .. })
+        ));
     }
 
     #[test]

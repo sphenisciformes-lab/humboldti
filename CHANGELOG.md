@@ -7,6 +7,11 @@ they are always listed under **Changed** or **Removed**.
 
 ## Unreleased
 
+### Fixed
+
+- Uppercase keys in `[keys.*]` (`"G"`, or `"shift-g"`) now work. They were
+  accepted but never matched, because the terminal reports them with Shift held.
+
 ## [0.2.0] - 2026-09-24
 
 ### Changed

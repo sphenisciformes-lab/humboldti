@@ -34,7 +34,28 @@ pub fn parse(spec: &str) -> Result<(KeyCode, KeyModifiers), KeyParseError> {
     let base = base.ok_or_else(|| KeyParseError::UnknownKey(spec.to_string()))?;
     let code = named_key(base).ok_or_else(|| KeyParseError::UnknownKey(base.to_string()))?;
 
-    Ok((code, modifiers))
+    Ok(normalize(code, modifiers))
+}
+
+/// 文字キーの Shift を修飾キーから外し、大文字小文字は文字そのものに持たせる。
+///
+/// crossterm は大文字を `Char('G')` + SHIFT として送ってくるが、設定では
+/// `G` とも `shift-g` とも書ける。照合の両側(設定から読んだキーと、実際に
+/// 届いたキー)をここで同じ形に揃えないと、`G` への割り当てが黙って効かない。
+pub fn normalize(code: KeyCode, modifiers: KeyModifiers) -> (KeyCode, KeyModifiers) {
+    match code {
+        KeyCode::Char(c) if modifiers.contains(KeyModifiers::SHIFT) => {
+            // `ß` のように大文字が複数文字になるものは、1つの Char に
+            // 収まらないのでそのまま使う。
+            let mut upper = c.to_uppercase();
+            let c = match (upper.next(), upper.next()) {
+                (Some(u), None) => u,
+                _ => c,
+            };
+            (KeyCode::Char(c), modifiers - KeyModifiers::SHIFT)
+        }
+        _ => (code, modifiers),
+    }
 }
 
 fn named_key(name: &str) -> Option<KeyCode> {
@@ -112,6 +133,22 @@ mod tests {
         assert_eq!(
             parse("[").unwrap(),
             (KeyCode::Char('['), KeyModifiers::NONE)
+        );
+    }
+
+    #[test]
+    fn uppercase_and_shift_forms_parse_to_the_same_key() {
+        let expected = (KeyCode::Char('G'), KeyModifiers::NONE);
+        assert_eq!(parse("G").unwrap(), expected);
+        assert_eq!(parse("shift-g").unwrap(), expected);
+        assert_eq!(parse("shift-G").unwrap(), expected);
+    }
+
+    #[test]
+    fn normalize_keeps_shift_on_non_char_keys() {
+        assert_eq!(
+            normalize(KeyCode::Tab, KeyModifiers::SHIFT),
+            (KeyCode::Tab, KeyModifiers::SHIFT)
         );
     }
 
