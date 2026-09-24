@@ -7,6 +7,8 @@ they are always listed under **Changed** or **Removed**.
 
 ## Unreleased
 
+## [0.2.0] - 2026-09-24
+
 ### Changed
 
 - The `editor` setting and `$EDITOR` are now run through `sh -c`, the same
@@ -27,3 +29,5 @@ they are always listed under **Changed** or **Removed**.
   heading, so a `pen <text>` running at the same time is no longer lost.
 - The search results list in `pen cal` scrolls to keep the selected result
   visible.
+
+[0.2.0]: https://github.com/sphenisciformes-lab/humboldti/compare/v0.1.2...v0.2.0
