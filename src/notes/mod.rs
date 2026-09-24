@@ -1,4 +1,4 @@
-use std::fs::OpenOptions;
+use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
@@ -285,6 +285,40 @@ pub fn as_todo(text: &str) -> String {
     }
 }
 
+/// ノートを読み書き両方で開き、排他ロックを取ってから返す。ロック前に読むと、
+/// 他プロセスが書き込み中の内容を読んでしまう可能性がある。
+///
+/// ロック待ちの間に別プロセスがファイルを削除することがある(`open_in_editor`
+/// は何も書かれなかった今日のノートを消す)。そのまま使うと、パスから切り離された
+/// 古いファイルに書き込んで内容が消えるので、ロック取得後にまだリンクされて
+/// いるかを確かめ、消されていたら開き直す。
+fn open_locked(path: &Path, create: bool) -> std::io::Result<File> {
+    loop {
+        let file = OpenOptions::new()
+            .create(create)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(path)?;
+        file.lock()?;
+        if !is_unlinked(&file)? {
+            return Ok(file);
+        }
+    }
+}
+
+#[cfg(unix)]
+fn is_unlinked(file: &File) -> std::io::Result<bool> {
+    use std::os::unix::fs::MetadataExt;
+    Ok(file.metadata()?.nlink() == 0)
+}
+
+// Windows は開いているファイルを既定で削除できないので、この競合は起きない。
+#[cfg(not(unix))]
+fn is_unlinked(_file: &File) -> std::io::Result<bool> {
+    Ok(false)
+}
+
 /// `notes_dir` 配下の今日のファイルにテキストを追記する。`merge_window_minutes`
 /// 以内の連続した追記は、新しい見出しを作らず既存の見出しの下にまとめる。
 ///
@@ -311,16 +345,7 @@ pub fn append(
         std::fs::create_dir_all(parent).map_err(io_err)?;
     }
 
-    // 読み書き両方で開き、ロックを取ってから読む。ロック前に読むと、
-    // 他プロセスが書き込み中の内容を読んでしまう可能性がある。
-    let mut file = OpenOptions::new()
-        .create(true)
-        .read(true)
-        .write(true)
-        .truncate(false)
-        .open(&path)
-        .map_err(io_err)?;
-    file.lock().map_err(io_err)?;
+    let mut file = open_locked(&path, true).map_err(io_err)?;
 
     let mut contents = String::new();
     file.read_to_string(&mut contents).map_err(io_err)?;
@@ -390,41 +415,47 @@ pub fn open_in_editor(
         std::fs::create_dir_all(parent).map_err(io_err)?;
     }
 
+    // 見出しの差し込みは append() と同じくロックの内側で読んでから書く。
+    // ロックはエディタの起動前に手放す(開いている間ずっと `pen <text>` を
+    // 待たせないため)。差し込んだ内容は、後で「何も書かれなかったか」を
+    // 判定するために `(元の長さ, 差し込み後の内容)` として覚えておく。
     let today = Local::now().date_naive();
-    // 読めない理由が「まだ無い」以外(非 UTF-8、権限など)なら中止する。
-    // 空として扱うと、見出しだけの内容で上書きしたうえ、何も書かれなければ
-    // 「元は空だった」としてファイルごと削除してしまう。
-    let original = if date == today {
-        match std::fs::read_to_string(&path) {
-            Ok(contents) => Some(contents),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(String::new()),
-            Err(source) => return Err(io_err(source)),
+    let seeded = if date == today {
+        let mut file = open_locked(&path, true).map_err(io_err)?;
+        // 読めない理由が非 UTF-8 などなら、何も書かずに中止する。空として
+        // 扱うと、見出しだけの内容で上書きしたうえ、何も書かれなければ
+        // 「元は空だった」としてファイルごと削除してしまう。
+        let mut original = String::new();
+        file.read_to_string(&mut original).map_err(io_err)?;
+        match pending_heading(&original, merge_window_minutes, Local::now()) {
+            Some(heading_line) => {
+                // 今日のファイルを今まさに新規作成する瞬間だけ、前日以前から
+                // 未完了タスクを繰り越しておく。エディタを開いたときに
+                // 最初から見えている状態にする。
+                let carried = if original.is_empty() {
+                    carry_over_items(notes_dir, date)
+                } else {
+                    Vec::new()
+                };
+                let carried_block = if carried.is_empty() {
+                    String::new()
+                } else {
+                    format!("{}\n\n", carried.join("\n"))
+                };
+                // append() と同じ理由で、見出しは繰り越し項目より後に置く。
+                let addition = format!("{carried_block}{heading_line}");
+                // read_to_string でカーソルは既に EOF にあるので、そのまま書けば追記になる。
+                file.write_all(addition.as_bytes()).map_err(io_err)?;
+                Some((original.len(), format!("{original}{addition}")))
+            }
+            // 開いた時点で今日のファイルが無ければ見出しは必ず要る
+            // (pending_heading は空の内容に対して必ず Some を返す)ので、
+            // ここに来るのは既存のファイルだけ。空ファイルは残らない。
+            None => None,
         }
     } else {
         None
     };
-    let seeded = original.as_ref().and_then(|original| {
-        pending_heading(original, merge_window_minutes, Local::now()).map(|heading_line| {
-            // 今日のファイルを今まさに新規作成する瞬間だけ、前日以前から
-            // 未完了タスクを繰り越しておく。エディタを開いたときに
-            // 最初から見えている状態にする。
-            let carried = if original.is_empty() {
-                carry_over_items(notes_dir, date)
-            } else {
-                Vec::new()
-            };
-            let carried_block = if carried.is_empty() {
-                String::new()
-            } else {
-                format!("{}\n\n", carried.join("\n"))
-            };
-            // append() と同じ理由で、見出しは繰り越し項目より後に置く。
-            format!("{original}{carried_block}{heading_line}")
-        })
-    });
-    if let Some(seeded) = &seeded {
-        std::fs::write(&path, seeded).map_err(io_err)?;
-    }
 
     let raw_editor = Some(editor)
         .filter(|e| !e.is_empty())
@@ -443,12 +474,24 @@ pub fn open_in_editor(
         return Err(NotesError::EditorExit { status });
     }
 
-    if let Some(seeded) = seeded {
-        let after = std::fs::read_to_string(&path).unwrap_or_default();
-        if after == seeded {
-            match original.filter(|o| !o.is_empty()) {
-                Some(original) => std::fs::write(&path, original).map_err(io_err)?,
-                None => std::fs::remove_file(&path).map_err(io_err)?,
+    if let Some((original_len, seeded)) = seeded {
+        // エディタが消していれば、戻すものは無い。
+        let mut file = match open_locked(&path, false) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(path),
+            Err(source) => return Err(io_err(source)),
+        };
+        let mut after = Vec::new();
+        file.read_to_end(&mut after).map_err(io_err)?;
+        if after == seeded.as_bytes() {
+            // 差し込んだ内容は元の内容の末尾に足しただけなので、元の長さに
+            // 切り詰めれば元に戻る。元が空なら、ファイル自体を作らなかった
+            // ことにする。削除はロックを持ったまま行う——ロック待ちの追記は
+            // open_locked がそれを検知して開き直す。
+            if original_len == 0 {
+                std::fs::remove_file(&path).map_err(io_err)?;
+            } else {
+                file.set_len(original_len as u64).map_err(io_err)?;
             }
         }
     }
@@ -715,6 +758,56 @@ mod tests {
 
             Ok(())
         });
+    }
+
+    #[test]
+    #[allow(clippy::result_large_err)]
+    fn open_in_editor_restores_an_existing_note_if_nothing_was_written() {
+        figment::Jail::expect_with(|jail| {
+            jail.set_env("EDITOR", "true"); // 何も書かずに正常終了するエディタ
+            let notes_dir = jail.directory().join("notes");
+            let today = Local::now().date_naive();
+            let path = note_path(&notes_dir, today);
+            std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+            // マージ期間 0 分なので、00:00 ちょうどでない限り見出しが差し込まれる。
+            let original = "## 00:00\n朝のメモ\n";
+            std::fs::write(&path, original).map_err(|e| e.to_string())?;
+
+            open_in_editor(&notes_dir, today, 0, "").map_err(|e| e.to_string())?;
+
+            assert_eq!(
+                std::fs::read_to_string(&path).map_err(|e| e.to_string())?,
+                original
+            );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn open_locked_reopens_a_note_deleted_while_waiting_for_the_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("2026-08-30.md");
+        std::fs::write(&path, "## 21:00\n").unwrap();
+
+        // open_in_editor が何も書かれなかった今日のノートを消すときと同じく、
+        // ロックを持ったまま削除する。
+        let holder = open_locked(&path, false).unwrap();
+        let waiter = {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                let mut file = open_locked(&path, true).unwrap();
+                file.write_all(b"new\n").unwrap();
+            })
+        };
+        // 待機側がロック待ちに入るまでの猶予。間に合わず削除後に開いた場合も
+        // 期待結果は同じなので、このテストが誤って落ちることはない。
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        std::fs::remove_file(&path).unwrap();
+        drop(holder);
+        waiter.join().unwrap();
+
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new\n");
     }
 
     #[test]
