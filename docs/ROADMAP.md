@@ -101,6 +101,9 @@ bigram のトークナイズが必須になる。FTS5 の既定トークナイ�
   せず、`run_mcp` の中だけで tokio ランタイムを組み立てて `block_on`
   する。実際に MCP の `initialize`/`tools/list`/`tools/call` を
   JSON-RPC で送って疎通確認済み。
+  v0.3 で `recent_notes(days)` を追加(`pen context` と同じ中身。トークン
+  予算は引数にせず既定値で固定——MCP の引数は凍結対象なので最小限にする)。
+  同じく v0.3 で `search_notes` を最大100行に制限。
 - `pen context --since 7d --max-tokens N`(完了)。直近のメモを
   LLM に渡す形で出力。`--since` は `7d`/`2w` のような日/週指定
   (ノートは1日1ファイルなので時間単位は意味を持たない)。トークン数は

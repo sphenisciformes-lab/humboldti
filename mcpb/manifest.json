@@ -2,9 +2,9 @@
   "manifest_version": "0.3",
   "name": "humboldti-note",
   "display_name": "Humboldti Note",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A minimal daily markdown note-taking tool for your terminal.",
-  "long_description": "Exposes your daily notes to Claude over MCP: search_notes, read_note, and append_note. Notes are plain markdown files under your notes directory (default ~/notes) -- no database, no lock-in.",
+  "long_description": "Exposes your daily notes to Claude over MCP: search_notes, read_note, append_note, and recent_notes. Notes are plain markdown files under your notes directory (default ~/notes) -- no database, no lock-in.",
   "author": {
     "name": "Humboldti Note contributors"
   },
@@ -21,9 +21,10 @@
     }
   },
   "tools": [
-    { "name": "search_notes", "description": "Search notes with a case-insensitive regular expression." },
+    { "name": "search_notes", "description": "Search notes with a case-insensitive regular expression (at most 100 matching lines, newest first)." },
     { "name": "read_note", "description": "Read a specific day's note (YYYY-MM-DD)." },
-    { "name": "append_note", "description": "Append text to today's note." }
+    { "name": "append_note", "description": "Append text to today's note." },
+    { "name": "recent_notes", "description": "Read the last few days of notes (default 7) as markdown." }
   ],
   "compatibility": {
     "platforms": ["darwin", "linux"]

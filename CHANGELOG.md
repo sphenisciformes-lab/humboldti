@@ -7,8 +7,21 @@ they are always listed under **Changed** or **Removed**.
 
 ## Unreleased
 
+## [0.3.0] - 2026-09-24
+
+### Added
+
+- `pen cal` marks today (bold and underlined), so you can find it after moving
+  the selection to another day.
+- MCP tool `recent_notes(days)`: returns the last `days` days of notes (default
+  7) as markdown within about 4000 tokens, the same output as `pen context`, so
+  an agent can read recent notes in one call.
+
 ### Changed
 
+- The MCP `search_notes` tool returns at most 100 matching lines (newest
+  first) and says how many more it left out, so one broad query can't fill an
+  agent's context. Use `pen search` for the full list.
 - `ctrl-c` can no longer be bound in `[keys.*]`; doing so fails to start
   `pen cal` with an error. It is reserved for quitting (see below).
 
@@ -26,6 +39,10 @@ they are always listed under **Changed** or **Removed**.
   titles) now show your configured keys. They were fixed text, so they showed
   the default keys even after you rebound them. Hints longer than the terminal
   is wide now end in `…` rather than being cut off without warning.
+- `pen context --since` with a huge value (such as `4000000000d`) no longer
+  crashes. The range is capped at about 100 years.
+- A search query longer than the input box no longer pushes the cursor out of
+  view. The box shows the end of the query, which is the part you're typing.
 
 ## [0.2.0] - 2026-09-24
 
@@ -50,4 +67,5 @@ they are always listed under **Changed** or **Removed**.
 - The search results list in `pen cal` scrolls to keep the selected result
   visible.
 
+[0.3.0]: https://github.com/sphenisciformes-lab/humboldti/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sphenisciformes-lab/humboldti/compare/v0.1.2...v0.2.0

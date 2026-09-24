@@ -196,20 +196,7 @@ fn run_context(json: bool, cfg: &Config, since: Since, max_tokens: usize) -> any
     let today = Local::now().date_naive();
     let out = notes::context(&cfg.notes_dir, since.0, max_tokens, today);
 
-    let plain = if out.days.is_empty() {
-        "no notes in range".to_string()
-    } else {
-        let mut sections: Vec<String> = out
-            .days
-            .iter()
-            .map(|(date, content)| format!("# {date}\n{content}"))
-            .collect();
-        sections.push(format!(
-            "<!-- estimated tokens: {} / budget: {} -->",
-            out.estimated_tokens, max_tokens
-        ));
-        sections.join("\n")
-    };
+    let plain = out.to_markdown(max_tokens);
 
     output(
         json,

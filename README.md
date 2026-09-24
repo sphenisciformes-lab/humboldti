@@ -83,6 +83,8 @@ detail.
 - Each day's background reflects how much you wrote that day (none / some /
   a lot), using your terminal's own ANSI colors — so it looks right in both
   light and dark themes instead of assuming a dark background.
+- Today is shown bold and underlined, so it stays easy to find after you move
+  the selection away.
 - A preview pane shows the selected day's note (hidden automatically on
   narrower terminals).
 - Default keys: `hjkl`/arrows move by day/week, `[`/`]` jump by month,
@@ -254,9 +256,10 @@ $ pen --json context --since 2w > fortnight.json    # feed to a script
 server over stdio, exposing three tools that call straight into the same code
 `pen` uses on the command line:
 
-- `search_notes(query)` — case-insensitive regex search across all notes
+- `search_notes(query)` — case-insensitive regex search across all notes (at most 100 matching lines, newest first)
 - `read_note(date)` — read one day's note (`YYYY-MM-DD`)
 - `append_note(text)` — append to today's note, same as `pen <text>`
+- `recent_notes(days)` — the last `days` days of notes (default 7) as markdown, same as `pen context`
 
 **Data flow.** Humboldti Note itself speaks stdio only — it never sends your
 notes anywhere on its own. But whatever client you connect it to might: if

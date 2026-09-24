@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use crate::notes;
+
 /// A minimal daily markdown note-taking tool for your terminal.
 ///
 /// Shell metacharacters in your note text (`&`, `|`, `>`, `[`, `]`, `*`, `?`, `~`, ...)
@@ -82,16 +84,16 @@ pub enum Command {
     /// Print recent notes in a form meant for feeding to an LLM.
     Context {
         /// How far back to go, e.g. `7d` or `2w`.
-        #[arg(long, default_value = "7d")]
+        #[arg(long, default_value_t = Since(notes::CONTEXT_DEFAULT_DAYS))]
         since: Since,
         /// Approximate token budget (a rough character-based estimate, not an
         /// exact count for any specific model's tokenizer). Whole days are
         /// dropped from the oldest end once the budget would be exceeded.
-        #[arg(long, default_value_t = 4000)]
+        #[arg(long, default_value_t = notes::CONTEXT_DEFAULT_MAX_TOKENS)]
         max_tokens: usize,
     },
     /// Run an MCP server (stdio transport) exposing search_notes, read_note,
-    /// and append_note to AI agents.
+    /// append_note, and recent_notes to AI agents.
     Mcp,
 }
 
@@ -100,6 +102,14 @@ pub enum Command {
 /// change which files are selected.
 #[derive(Debug, Clone, Copy)]
 pub struct Since(pub u32);
+
+// clap が `--help` に既定値を表示するときに使う。`FromStr` が受け付ける形で
+// 出力する(週単位に戻せる場合でも日単位で出す)。
+impl std::fmt::Display for Since {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}d", self.0)
+    }
+}
 
 impl std::str::FromStr for Since {
     type Err = String;

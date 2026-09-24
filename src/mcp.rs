@@ -27,6 +27,12 @@ impl PenMcp {
     }
 }
 
+/// `search_notes` が返すヒットの上限。数年分のノートをありふれた語で検索すると
+/// 数千行になり、エージェントのコンテキストを1回の呼び出しで使い切ってしまう。
+/// ヒットは新しい日付順なので、残るのは直近のもの。引数で変えられるように
+/// しないのは、MCP の引数が凍結対象の公開 API だから(CLAUDE.md)。
+const SEARCH_NOTES_LIMIT: usize = 100;
+
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 struct SearchNotesParams {
     /// Case-insensitive regular expression to search for.
@@ -40,6 +46,12 @@ struct ReadNoteParams {
 }
 
 #[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+struct RecentNotesParams {
+    /// How many days to include, counting today. Defaults to 7.
+    days: Option<u32>,
+}
+
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
 struct AppendNoteParams {
     /// Text to append to today's note.
     text: String,
@@ -47,7 +59,10 @@ struct AppendNoteParams {
 
 #[tool_router]
 impl PenMcp {
-    #[tool(description = "Search notes. The query is a case-insensitive regular expression.")]
+    #[tool(
+        description = "Search notes. The query is a case-insensitive regular expression. \
+            Returns at most 100 matching lines, newest first."
+    )]
     fn search_notes(
         &self,
         Parameters(SearchNotesParams { query }): Parameters<SearchNotesParams>,
@@ -57,11 +72,18 @@ impl PenMcp {
                 "no matches",
             )])),
             Ok(hits) => {
-                let text = hits
+                let mut text = hits
                     .iter()
+                    .take(SEARCH_NOTES_LIMIT)
                     .map(|h| format!("{}:{}: {}", h.path.display(), h.line_number, h.line))
                     .collect::<Vec<_>>()
                     .join("\n");
+                let omitted = hits.len().saturating_sub(SEARCH_NOTES_LIMIT);
+                if omitted > 0 {
+                    text.push_str(&format!(
+                        "\n({omitted} more matching lines not shown; narrow the query to see them)"
+                    ));
+                }
                 Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
             }
             Err(err) => Ok(CallToolResult::error(vec![ContentBlock::text(
@@ -113,6 +135,30 @@ impl PenMcp {
             )])),
         }
     }
+
+    /// `pen context` と同じ中身を返す。トークン予算は引数にせず既定値で固定する
+    /// (MCP の引数は凍結対象の公開 API なので、増やすのは本当に要るとき
+    /// だけにする)。
+    #[tool(
+        description = "Read the most recent notes (today and the days before it) as \
+            markdown, oldest first, one `# YYYY-MM-DD` section per day. Whole days are \
+            dropped from the oldest end to stay within about 4000 tokens."
+    )]
+    fn recent_notes(
+        &self,
+        Parameters(RecentNotesParams { days }): Parameters<RecentNotesParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let days = days.unwrap_or(notes::CONTEXT_DEFAULT_DAYS);
+        let out = notes::context(
+            &self.notes_dir,
+            days,
+            notes::CONTEXT_DEFAULT_MAX_TOKENS,
+            Local::now().date_naive(),
+        );
+        Ok(CallToolResult::success(vec![ContentBlock::text(
+            out.to_markdown(notes::CONTEXT_DEFAULT_MAX_TOKENS),
+        )]))
+    }
 }
 
 #[tool_handler(
@@ -156,6 +202,28 @@ mod tests {
 
         assert!(!result.is_error.unwrap_or(false));
         assert!(text_of(&result).contains("Meeting notes"));
+    }
+
+    #[test]
+    fn search_notes_returns_at_most_the_limit_and_says_how_many_were_left_out() {
+        let tmp = tempfile::tempdir().unwrap();
+        let date = NaiveDate::from_ymd_opt(2026, 8, 30).unwrap();
+        let contents: String = (0..SEARCH_NOTES_LIMIT + 5)
+            .map(|i| format!("token {i}\n"))
+            .collect();
+        write_note(tmp.path(), date, &contents);
+        let server = PenMcp::new(tmp.path().to_path_buf(), 30);
+
+        let result = server
+            .search_notes(Parameters(SearchNotesParams {
+                query: "token".to_string(),
+            }))
+            .unwrap();
+
+        let text = text_of(&result);
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(lines.len(), SEARCH_NOTES_LIMIT + 1);
+        assert!(lines[SEARCH_NOTES_LIMIT].contains("5 more matching lines not shown"));
     }
 
     #[test]
@@ -229,6 +297,66 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(err.code, rmcp::model::ErrorCode::INVALID_PARAMS);
+    }
+
+    #[test]
+    fn recent_notes_is_registered_with_a_days_argument() {
+        let tools = PenMcp::tool_router().list_all();
+        let tool = tools
+            .iter()
+            .find(|t| t.name == "recent_notes")
+            .expect("recent_notes が tools/list に出ていない");
+        let schema = serde_json::to_string(&tool.input_schema).unwrap();
+        assert!(schema.contains("\"days\""));
+    }
+
+    #[test]
+    fn recent_notes_returns_the_last_days_as_markdown() {
+        let tmp = tempfile::tempdir().unwrap();
+        let today = Local::now().date_naive();
+        write_note(tmp.path(), today, "今日のメモ\n");
+        write_note(
+            tmp.path(),
+            today - chrono::Duration::days(2),
+            "おとといのメモ\n",
+        );
+        write_note(
+            tmp.path(),
+            today - chrono::Duration::days(30),
+            "先月のメモ\n",
+        );
+        let server = PenMcp::new(tmp.path().to_path_buf(), 30);
+
+        let result = server
+            .recent_notes(Parameters(RecentNotesParams { days: None }))
+            .unwrap();
+        let text = text_of(&result);
+
+        assert!(text.contains(&format!("# {today}\n今日のメモ")));
+        assert!(text.contains("おとといのメモ"));
+        // 既定の 7 日より古いものは入らない。
+        assert!(!text.contains("先月のメモ"));
+        // 古い日が先。
+        assert!(text.find("おととい").unwrap() < text.find("今日のメモ").unwrap());
+
+        let result = server
+            .recent_notes(Parameters(RecentNotesParams { days: Some(1) }))
+            .unwrap();
+        let text = text_of(&result);
+        assert!(text.contains("今日のメモ"));
+        assert!(!text.contains("おとといのメモ"));
+    }
+
+    #[test]
+    fn recent_notes_reports_an_empty_range() {
+        let tmp = tempfile::tempdir().unwrap();
+        let server = PenMcp::new(tmp.path().to_path_buf(), 30);
+
+        let result = server
+            .recent_notes(Parameters(RecentNotesParams { days: Some(3) }))
+            .unwrap();
+
+        assert_eq!(text_of(&result), "no notes in range");
     }
 
     #[test]

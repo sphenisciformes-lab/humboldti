@@ -78,6 +78,7 @@ Humboldti Note には、サブコマンドを伴わない**素の形**と、**�
 
 - 日曜始まりの月グリッドです。
 - その日書いた分量(無し/やや多い/かなり多い)を背景色で表します。  
+- 今日は太字+下線で表示するので、選択を別の日に動かしても見つけられます。
 - 選択中の日のノートをプレビューペインに表示します。
 - 既定のキー :  
 `hjkl`/矢印で日/週移動  
@@ -245,9 +246,10 @@ $ pen --json context --since 2w > fortnight.json    # スクリプトに渡す
 `pen mcp` は [Model Context Protocol](https://modelcontextprotocol.io) のサーバーを stdio 上で動かします。  
 公開する3つのツールは、コマンドラインの`pen` と同じコードをそのまま呼んでいます:
 
-- `search_notes(query)` — 大文字小文字を区別しない正規表現でメモ全体を検索
+- `search_notes(query)` — 大文字小文字を区別しない正規表現でメモ全体を検索(新しい順に最大100行)
 - `read_note(date)` — 指定した日(`YYYY-MM-DD`)のメモを読む
 - `append_note(text)` — 今日のメモに追記(`pen <text>` と同じ)
+- `recent_notes(days)` — 直近 `days` 日分(既定 7 日)のメモをマークダウンで返す(`pen context` と同じ)
 
 **データの流れ。** Humboldti Note 自身は stdio のみで動作し、メモをどこかへ自発的に送信することはありません。  
 ただし接続先次第では送信されます。クラウド型の AI クライアントをつなぐと、  

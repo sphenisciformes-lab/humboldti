@@ -59,7 +59,12 @@ pub fn draw_input(frame: &mut Frame, state: &SearchState, help: &str) {
     let title = bordered_title(&format!("Search ({help})"), input_area.width);
     let block = Block::bordered().title(title);
     let inner = block.inner(input_area);
-    let text = format!("/{}", state.query);
+    // 入力欄より長いクエリは、今打っている末尾側を見せる。カーソルを
+    // 置く 1 桁を残しておかないと、カーソルが枠の外に出て見えなくなる。
+    let text = width::tail(
+        &format!("/{}", state.query),
+        (inner.width as usize).saturating_sub(1),
+    );
     frame.render_widget(Paragraph::new(text.clone()).block(block), input_area);
 
     // ここは実際にテキストを入力する場所なので、末尾にカーソルを明示する
@@ -261,6 +266,33 @@ mod tests {
             "選択中の7件目が画面外に出ている"
         );
         assert!(!content.contains("2026-08-01"));
+    }
+
+    #[test]
+    fn long_query_keeps_its_end_and_the_cursor_inside_the_box() {
+        let backend = TestBackend::new(20, 5);
+        let mut terminal = Terminal::new(backend).unwrap();
+        let mut state = SearchState::new();
+        state.query = "とても長い日本語の検索クエリの末尾".to_string();
+
+        terminal
+            .draw(|frame| draw_input(frame, &state, ""))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer().clone();
+        // 全角文字の右半分のセルは空白として読めてしまうので、表示幅ぶん
+        // 飛ばしながら読む。
+        let mut input_row = String::new();
+        let mut x = 0;
+        while x < buffer.area.width {
+            let symbol = buffer[(x, 1)].symbol();
+            input_row.push_str(symbol);
+            x += width::width(symbol).max(1) as u16;
+        }
+        assert!(input_row.contains("末尾"), "今打っている末尾が見えていない");
+        // カーソルは右の枠線(x = 19)より内側にある。
+        let cursor = terminal.get_cursor_position().unwrap();
+        assert!(cursor.x < 19, "カーソルが枠の外に出ている: {cursor:?}");
     }
 
     #[test]
