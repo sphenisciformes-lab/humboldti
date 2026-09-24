@@ -268,6 +268,11 @@ fn open_and_resume(
 
 fn run_cal(cfg: &Config) -> anyhow::Result<()> {
     let keymap = action::KeyMap::from_config(&cfg.keys)?;
+    // 割り当ては起動中に変わらないので、案内は一度だけ組み立てる。
+    // 区切りは既定の割り当てで 80 桁の端末に収まる幅にしてある。
+    let calendar_help = keymap.help_items(Mode::Calendar).join("  ");
+    let search_input_help = keymap.help_items(Mode::SearchInput).join(", ");
+    let search_results_help = keymap.help_items(Mode::SearchResults).join(", ");
     let mut terminal = ratatui::try_init()?;
     let mut calendar_state = CalendarState::new(Local::now().date_naive());
     let mut search_state = SearchState::new();
@@ -276,11 +281,17 @@ fn run_cal(cfg: &Config) -> anyhow::Result<()> {
     let result = (|| -> anyhow::Result<()> {
         loop {
             terminal.draw(|frame| match screen {
-                Screen::Calendar => {
-                    calendar::draw(frame, &calendar_state, &cfg.notes_dir, &cfg.weekday_labels)
+                Screen::Calendar => calendar::draw(
+                    frame,
+                    &calendar_state,
+                    &cfg.notes_dir,
+                    &cfg.weekday_labels,
+                    &calendar_help,
+                ),
+                Screen::SearchInput => search::draw_input(frame, &search_state, &search_input_help),
+                Screen::SearchResults => {
+                    search::draw_results(frame, &mut search_state, &search_results_help)
                 }
-                Screen::SearchInput => search::draw_input(frame, &search_state),
-                Screen::SearchResults => search::draw_results(frame, &mut search_state),
             })?;
 
             let Event::Key(key) = event::read()? else {

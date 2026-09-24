@@ -22,6 +22,10 @@ they are always listed under **Changed** or **Removed**.
   accepted but never matched, because the terminal reports them with Shift held.
 - Tab-indented lines (such as nested `- [ ]` items) keep their indentation in
   the `pen cal` preview pane and search results. Tabs used to be dropped.
+- The key hints in `pen cal` (the calendar's bottom line and the search screen
+  titles) now show your configured keys. They were fixed text, so they showed
+  the default keys even after you rebound them. Hints longer than the terminal
+  is wide now end in `…` rather than being cut off without warning.
 
 ## [0.2.0] - 2026-09-24
 
