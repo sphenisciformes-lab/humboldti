@@ -249,6 +249,7 @@ $ pen --json context --since 2w > fortnight.json    # スクリプトに渡す
 - `search_notes(query)` — 大文字小文字を区別しない正規表現でメモ全体を検索(新しい順に最大100行)
 - `read_note(date)` — 指定した日(`YYYY-MM-DD`)のメモを読む
 - `append_note(text)` — 今日のメモに追記(`pen <text>` と同じ)
+- `recent_notes(days)` — 直近 `days` 日分(既定 7 日)のメモをマークダウンで返す(`pen context` と同じ)
 
 **データの流れ。** Humboldti Note 自身は stdio のみで動作し、メモをどこかへ自発的に送信することはありません。  
 ただし接続先次第では送信されます。クラウド型の AI クライアントをつなぐと、  

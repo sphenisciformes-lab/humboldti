@@ -11,6 +11,9 @@ they are always listed under **Changed** or **Removed**.
 
 - `pen cal` marks today (bold and underlined), so you can find it after moving
   the selection to another day.
+- MCP tool `recent_notes(days)`: returns the last `days` days of notes (default
+  7) as markdown within about 4000 tokens, the same output as `pen context`, so
+  an agent can read recent notes in one call.
 
 ### Changed
 

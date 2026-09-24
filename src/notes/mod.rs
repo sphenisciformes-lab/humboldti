@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, Duration, Local, NaiveDate, NaiveTime};
 
-pub use context::{ContextOutput, context};
+pub use context::{CONTEXT_DEFAULT_DAYS, CONTEXT_DEFAULT_MAX_TOKENS, ContextOutput, context};
 pub use editor::open_in_editor;
 pub use search::{SearchHit, search};
 

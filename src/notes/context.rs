@@ -12,6 +12,11 @@ fn estimate_tokens(s: &str) -> usize {
     s.chars().count().div_ceil(2)
 }
 
+/// `pen context` と MCP の `recent_notes` が共有する既定値。どちらかだけ
+/// 変わると、同じ「直近のノート」が入口によって違う範囲になるので1箇所に書く。
+pub const CONTEXT_DEFAULT_DAYS: u32 = 7;
+pub const CONTEXT_DEFAULT_MAX_TOKENS: usize = 4000;
+
 /// 遡る日数の上限(約100年)。1日1ファイルを1日ずつ stat していくので、
 /// 上限が無いと `--since 4000000000d` のような値で日付の計算があふれて
 /// panic し、あふれない範囲でも事実上終わらなくなる。人が書くノートの期間と
@@ -23,6 +28,27 @@ pub struct ContextOutput {
     /// 古い日付が先。
     pub days: Vec<(NaiveDate, String)>,
     pub estimated_tokens: usize,
+}
+
+impl ContextOutput {
+    /// LLM にそのまま渡せるマークダウン。日ごとに `# YYYY-MM-DD` の見出しを付け、
+    /// 末尾に概算トークン数をコメントで添える。`pen context` と MCP の
+    /// `recent_notes` が同じ形で返すよう、ここにだけ書く。
+    pub fn to_markdown(&self, max_tokens: usize) -> String {
+        if self.days.is_empty() {
+            return "no notes in range".to_string();
+        }
+        let mut sections: Vec<String> = self
+            .days
+            .iter()
+            .map(|(date, content)| format!("# {date}\n{content}"))
+            .collect();
+        sections.push(format!(
+            "<!-- estimated tokens: {} / budget: {max_tokens} -->",
+            self.estimated_tokens
+        ));
+        sections.join("\n")
+    }
 }
 
 /// `today` から `since_days` 日分(当日を含む)のノートを、新しい日から
