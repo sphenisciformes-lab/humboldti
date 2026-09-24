@@ -391,8 +391,15 @@ pub fn open_in_editor(
     }
 
     let today = Local::now().date_naive();
+    // 読めない理由が「まだ無い」以外(非 UTF-8、権限など)なら中止する。
+    // 空として扱うと、見出しだけの内容で上書きしたうえ、何も書かれなければ
+    // 「元は空だった」としてファイルごと削除してしまう。
     let original = if date == today {
-        Some(std::fs::read_to_string(&path).unwrap_or_default())
+        match std::fs::read_to_string(&path) {
+            Ok(contents) => Some(contents),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Some(String::new()),
+            Err(source) => return Err(io_err(source)),
+        }
     } else {
         None
     };
@@ -705,6 +712,26 @@ mod tests {
                 !path.exists(),
                 "何も書かなかったのに見出しだけのファイルが残っている"
             );
+
+            Ok(())
+        });
+    }
+
+    #[test]
+    #[allow(clippy::result_large_err)]
+    fn open_in_editor_leaves_an_unreadable_todays_note_untouched() {
+        figment::Jail::expect_with(|jail| {
+            jail.set_env("EDITOR", "true"); // 何も書かずに正常終了するエディタ
+            let notes_dir = jail.directory().join("notes");
+            let today = Local::now().date_naive();
+            let path = note_path(&notes_dir, today);
+            std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
+            // Shift_JIS の「あ」を含む、UTF-8 として読めない内容。
+            let original: &[u8] = b"important \x82\xa0\n";
+            std::fs::write(&path, original).map_err(|e| e.to_string())?;
+
+            assert!(open_in_editor(&notes_dir, today, 30, "").is_err());
+            assert_eq!(std::fs::read(&path).map_err(|e| e.to_string())?, original);
 
             Ok(())
         });
