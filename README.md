@@ -88,7 +88,7 @@ detail.
 - Default keys: `hjkl`/arrows move by day/week, `[`/`]` jump by month,
   `{`/`}` jump by year, `Enter` opens the selected day in `$EDITOR`, `/`
   starts a search, `q`/`Esc` quits. Every one of these is rebindable — see
-  [Configuration](#configuration).
+  [Configuration](#configuration). `Ctrl-C` always quits, from any screen.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/sphenisciformes-lab/humboldti/main/assets/demo-preview-editor.gif" alt="Demo: the preview pane and opening a day in $EDITOR" width="700">

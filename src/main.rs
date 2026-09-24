@@ -326,6 +326,7 @@ fn run_cal(cfg: &Config) -> anyhow::Result<()> {
                         Err(err) => search_state.error = Some(err.to_string()),
                     },
                     Action::Cancel => screen = Screen::Calendar,
+                    Action::Quit => return Ok(()),
                     _ => {}
                 },
                 Screen::SearchResults => match action {
@@ -339,6 +340,7 @@ fn run_cal(cfg: &Config) -> anyhow::Result<()> {
                         }
                     }
                     Action::Cancel => screen = Screen::Calendar,
+                    Action::Quit => return Ok(()),
                     _ => {}
                 },
             }
