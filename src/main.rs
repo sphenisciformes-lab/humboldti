@@ -280,7 +280,7 @@ fn run_cal(cfg: &Config) -> anyhow::Result<()> {
                     calendar::draw(frame, &calendar_state, &cfg.notes_dir, &cfg.weekday_labels)
                 }
                 Screen::SearchInput => search::draw_input(frame, &search_state),
-                Screen::SearchResults => search::draw_results(frame, &search_state),
+                Screen::SearchResults => search::draw_results(frame, &mut search_state),
             })?;
 
             let Event::Key(key) = event::read()? else {
@@ -319,6 +319,7 @@ fn run_cal(cfg: &Config) -> anyhow::Result<()> {
                         Ok(results) => {
                             search_state.results = results;
                             search_state.selected = 0;
+                            search_state.offset = 0;
                             search_state.error = None;
                             screen = Screen::SearchResults;
                         }
