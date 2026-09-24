@@ -102,7 +102,6 @@ bigram のトークナイズが必須になる。FTS5 の既定トークナイ�
   する。実際に MCP の `initialize`/`tools/list`/`tools/call` を
   JSON-RPC で送って疎通確認済み。
 - `pen context --since 7d --max-tokens N`(完了)。直近のメモを
-- `pen context --since 7d --max-tokens N`(完了)。直近のメモを
   LLM に渡す形で出力。`--since` は `7d`/`2w` のような日/週指定
   (ノートは1日1ファイルなので時間単位は意味を持たない)。トークン数は
   文字数ベースの簡易推定(1トークン≒2文字、日本語混在を想定して安全側)。
