@@ -176,28 +176,36 @@ fn last_heading(contents: &str) -> Option<(String, NaiveTime)> {
     })
 }
 
+/// 今この瞬間の追記をマージ期間内として既存の見出しの続きに書けるなら、
+/// その見出し(`HH:MM`)を返す。
+///
+/// `append` と、エディタで開く前の見出し差し込み(`open_in_editor`)の
+/// 両方から使う判定ロジックなので、ここに1箇所だけ書く。
+fn merge_target(contents: &str, merge_window_minutes: u32, now: DateTime<Local>) -> Option<String> {
+    let (heading, last_time) = last_heading(contents)?;
+    let diff = now.time() - last_time;
+    (diff >= Duration::zero() && diff <= Duration::minutes(i64::from(merge_window_minutes)))
+        .then_some(heading)
+}
+
 /// 今この瞬間に何かを追記するなら、新しい時刻見出しが要るかどうかを判定する。
 /// マージ期間内(既存の見出しの続きとして書ける)なら `None`。
 /// 要るなら、区切りの改行込みの見出し行(例: `"\n## 21:07\n"`)を返す。
-///
-/// `append` と、エディタで開く前の見出し差し込み(`main.rs` の `run_open`)の
-/// 両方から使う判定ロジックなので、ここに1箇所だけ書く。
 pub fn pending_heading(
     contents: &str,
     merge_window_minutes: u32,
     now: DateTime<Local>,
 ) -> Option<String> {
-    let merge = last_heading(contents).is_some_and(|(_, last_time)| {
-        let diff = now.time() - last_time;
-        diff >= Duration::zero() && diff <= Duration::minutes(i64::from(merge_window_minutes))
-    });
-
-    if merge {
-        None
-    } else {
-        let sep = if contents.is_empty() { "" } else { "\n" };
-        Some(format!("{sep}## {}\n", now.format("%H:%M")))
+    match merge_target(contents, merge_window_minutes, now) {
+        Some(_) => None,
+        None => Some(new_heading_line(contents, now)),
     }
+}
+
+/// `contents` の末尾に足す、区切りの改行込みの新しい時刻見出し行。
+fn new_heading_line(contents: &str, now: DateTime<Local>) -> String {
+    let sep = if contents.is_empty() { "" } else { "\n" };
+    format!("{sep}## {}\n", now.format("%H:%M"))
 }
 
 /// これより遡って未完了タスクを探す上限。実際に見つからなければそれ以上
@@ -350,8 +358,10 @@ pub fn append(
     let mut contents = String::new();
     file.read_to_string(&mut contents).map_err(io_err)?;
 
-    let (to_append, heading, merged) = match pending_heading(&contents, merge_window_minutes, now) {
-        Some(heading_line) => {
+    let (to_append, heading, merged) = match merge_target(&contents, merge_window_minutes, now) {
+        Some(heading) => (format!("\n{text}\n"), heading, true),
+        None => {
+            let heading_line = new_heading_line(&contents, now);
             let heading = now.format("%H:%M").to_string();
             // 今日のファイルを今まさに新規作成する瞬間だけ、前日以前から
             // 未完了タスクを繰り越す。
@@ -373,11 +383,6 @@ pub fn append(
                 heading,
                 false,
             )
-        }
-        None => {
-            let (heading, _) =
-                last_heading(&contents).expect("no pending heading implies a previous one exists");
-            (format!("\n{text}\n"), heading, true)
         }
     };
 
